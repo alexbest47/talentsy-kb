@@ -99,7 +99,7 @@ const productDetails: Record<string, ProductDetail> = {
 // ========== HELPERS ==========
 
 function generateId() {
-  return crypto.randomUUID?.() || 'doc_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now()
+  return crypto.randomUUID()
 }
 
 function generateShareToken() {
@@ -479,32 +479,58 @@ export default function ProductDetailPage() {
   const handleSave = async (data: DocItem) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase
-        .from('documents')
-        .upsert({
-          id: data.id,
-          title: data.title,
-          content: data.content,
-          category: data.category,
-          access: data.access,
-          share_token: data.share_token,
-          product_id: data.product_id,
-          author: data.author,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-        })
+      const isExisting = docs.some((d) => d.id === data.id)
 
-      if (error) {
-        console.error('Error saving document:', error)
-        return
+      if (isExisting) {
+        // Update existing document
+        const { error } = await supabase
+          .from('documents')
+          .update({
+            title: data.title,
+            content: data.content,
+            category: data.category,
+            access: data.access,
+            share_token: data.share_token,
+            product_id: data.product_id,
+            author: data.author,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', data.id)
+
+        if (error) {
+          console.error('Error updating document:', error)
+          alert('Ошибка при сохранении: ' + error.message)
+          return
+        }
+
+        setDocs((prev) => prev.map((d) => (d.id === data.id ? data : d)))
+      } else {
+        // Insert new document — don't send id, let Supabase generate UUID
+        const { data: inserted, error } = await supabase
+          .from('documents')
+          .insert({
+            title: data.title,
+            content: data.content,
+            category: data.category,
+            access: data.access,
+            share_token: data.share_token,
+            product_id: data.product_id,
+            author: data.author,
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Error inserting document:', error)
+          alert('Ошибка при создании: ' + error.message)
+          return
+        }
+
+        if (inserted) {
+          setDocs((prev) => [...prev, inserted])
+        }
       }
 
-      // Update local state
-      setDocs((prev) => {
-        const exists = prev.find((d) => d.id === data.id)
-        if (exists) return prev.map((d) => (d.id === data.id ? data : d))
-        return [...prev, data]
-      })
       setEditorOpen(false)
       setEditingDoc(null)
     } catch (err) {
