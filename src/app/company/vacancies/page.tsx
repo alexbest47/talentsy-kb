@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -9,8 +10,12 @@ import {
   MapPin,
   Users,
   Briefcase,
+  Edit2,
+  Check,
+  X,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { createClient } from '@/lib/supabase/client'
 
 interface Vacancy {
   id: string
@@ -21,69 +26,6 @@ interface Vacancy {
   description: string
   teamSize?: number
 }
-
-const vacancies: Vacancy[] = [
-  {
-    id: 'v1',
-    position: 'Операционный директор / COO',
-    department: 'Прямое подчинение CEO',
-    reportsTo: 'Кузьмин Александр Викторович (CEO)',
-    priority: 'critical',
-    description:
-      'Управление операционной деятельностью компании. Координация работы отделов продаж, маркетинга, технического отдела, продукта, администрации и HR.',
-    teamSize: 70,
-  },
-  {
-    id: 'v2',
-    position: 'Директор по маркетингу',
-    department: 'Подчинение COO',
-    reportsTo: 'Операционный директор (COO)',
-    priority: 'critical',
-    description:
-      'Руководство маркетинговым направлением: performance, продуктовый маркетинг, контент и SMM. Управление командой из 10+ специалистов.',
-    teamSize: 10,
-  },
-  {
-    id: 'v3',
-    position: 'Head of PMM',
-    department: 'Маркетинг',
-    reportsTo: 'Директор по маркетингу',
-    priority: 'high',
-    description:
-      'Руководство отделом продуктового маркетинга: веб-дизайн, вёрстка, CRM-маркетинг. В подчинении 5 специалистов.',
-    teamSize: 5,
-  },
-  {
-    id: 'v4',
-    position: 'Head of Content',
-    department: 'Маркетинг',
-    reportsTo: 'Директор по маркетингу',
-    priority: 'high',
-    description:
-      'Руководство контент-направлением: SMM, дизайн, контент-стратегия. В подчинении 3 специалиста.',
-    teamSize: 3,
-  },
-  {
-    id: 'v5',
-    position: 'Тимлид ОП №2',
-    department: 'Продажи',
-    reportsTo: 'Подколзин Евгений (Директор по продажам)',
-    priority: 'high',
-    description:
-      'Управление второй командой отдела продаж из 11 менеджеров. Контроль выполнения плана, обучение и развитие команды.',
-    teamSize: 11,
-  },
-  {
-    id: 'v6',
-    position: 'Тимлид колл-центра',
-    department: 'Продажи',
-    reportsTo: 'Подколзин Евгений (Директор по продажам)',
-    priority: 'high',
-    description:
-      'Управление колл-центром из 8 операторов (включая 2 в декрете). Контроль качества звонков, обучение, отчётность.',
-    teamSize: 8,
-  },
-]
 
 const priorityConfig = {
   critical: {
@@ -113,6 +55,100 @@ const priorityConfig = {
 }
 
 export default function VacanciesPage() {
+  const [vacancies, setVacancies] = useState<Vacancy[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const fetchVacancies = async () => {
+      try {
+        const supabase = createClient()
+
+        // Fetch positions that are vacancies
+        const { data, error } = await supabase
+          .from('positions')
+          .select('*')
+          .eq('is_vacancy', true)
+          .order('sort_order', { ascending: true })
+
+        if (error) throw error
+
+        // Transform positions data to Vacancy format
+        const transformedVacancies: Vacancy[] = (data || []).map((pos) => ({
+          id: pos.id?.toString() || pos.title,
+          position: pos.title,
+          department: pos.department || 'CEO',
+          reportsTo: pos.reports_to || 'CEO',
+          priority: pos.level === 'ceo-1' ? 'critical' : pos.level === 'ceo-2' ? 'critical' : 'high',
+          description: pos.extra || pos.key_result || 'Вакансия на должность',
+          teamSize: pos.subordinates?.length || 0,
+        }))
+
+        setVacancies(transformedVacancies)
+      } catch (error) {
+        console.error('Error fetching vacancies:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchVacancies()
+  }, [])
+
+  const handleEditStart = (vacancy: Vacancy) => {
+    setEditingId(vacancy.id)
+    setEditValue(vacancy.description)
+  }
+
+  const handleSave = async (vacancy: Vacancy) => {
+    if (!editValue.trim()) return
+
+    setSaving(true)
+    try {
+      const supabase = createClient()
+
+      // Update the positions table
+      const { error } = await supabase
+        .from('positions')
+        .update({ extra: editValue })
+        .eq('title', vacancy.position)
+
+      if (error) throw error
+
+      // Update local state
+      setVacancies((prev) =>
+        prev.map((v) =>
+          v.id === vacancy.id ? { ...v, description: editValue } : v
+        )
+      )
+
+      setEditingId(null)
+      setEditValue('')
+    } catch (error) {
+      console.error('Error saving vacancy:', error)
+      alert('Ошибка при сохранении. Попробуйте снова.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setEditingId(null)
+    setEditValue('')
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center py-12">
+          <p className="text-slate-600">Загрузка вакансий...</p>
+        </div>
+      </div>
+    )
+  }
+
   const criticalCount = vacancies.filter((v) => v.priority === 'critical').length
   const highCount = vacancies.filter((v) => v.priority === 'high').length
 
@@ -154,6 +190,8 @@ export default function VacanciesPage() {
       <div className="space-y-4">
         {vacancies.map((vacancy) => {
           const prio = priorityConfig[vacancy.priority]
+          const isEditing = editingId === vacancy.id
+
           return (
             <div
               key={vacancy.id}
@@ -172,12 +210,12 @@ export default function VacanciesPage() {
                       <Briefcase size={14} />
                       {vacancy.department}
                     </span>
-                    {vacancy.teamSize && (
+                    {vacancy.teamSize ? (
                       <span className="flex items-center gap-1">
                         <Users size={14} />
                         {vacancy.teamSize} чел. в команде
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 <span
@@ -192,9 +230,47 @@ export default function VacanciesPage() {
                 </span>
               </div>
 
-              <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                {vacancy.description}
-              </p>
+              {isEditing ? (
+                <div className="space-y-3 mb-3">
+                  <textarea
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={3}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => handleCancel()}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <X size={14} />
+                      Отмена
+                    </button>
+                    <button
+                      onClick={() => handleSave(vacancy)}
+                      disabled={saving || !editValue.trim()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <Check size={14} />
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 mb-3 leading-relaxed">
+                    {vacancy.description}
+                  </p>
+                  <button
+                    onClick={() => handleEditStart(vacancy)}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 mb-3"
+                  >
+                    <Edit2 size={13} />
+                    Редактировать описание
+                  </button>
+                </>
+              )}
 
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-400">

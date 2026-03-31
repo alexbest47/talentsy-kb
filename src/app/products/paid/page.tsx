@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Search, Plus, X, ExternalLink, Loader } from 'lucide-react'
+import { Search, Plus, X, ExternalLink, Loader, Edit3 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
 
@@ -99,10 +99,8 @@ function ProductCard({ product }: { product: ProductWithTags }) {
             Обновлено {new Date(product.updated_at).toLocaleDateString('ru-RU')}
           </span>
           <div className="flex items-center gap-2 ml-auto">
-            <Link href={`/products/paid/${product.slug}/edit`}>
-              <button className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
-                Редактировать
-              </button>
+            <Link href={`/products/paid/${product.slug}`} title="Редактировать">
+              <Edit3 size={14} className="text-slate-400 hover:text-purple-600 transition-colors cursor-pointer" />
             </Link>
             <Link href={`/products/paid/${product.slug}`}>
               <button className="text-xs font-medium text-purple-600 hover:text-purple-800 flex items-center gap-1 transition-colors">

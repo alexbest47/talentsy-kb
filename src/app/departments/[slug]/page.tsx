@@ -70,11 +70,13 @@ function EmployeeRow({
   employee,
   onEdit,
   onSave,
+  onDelete,
   editingId,
 }: {
   employee: OrgEmployee
   onEdit: (id: string) => void
   onSave: (id: string, name: string, role: string, note: string | null) => void
+  onDelete: (id: string) => void
   editingId: string | null
 }) {
   const [editName, setEditName] = useState(employee.name)
@@ -152,6 +154,12 @@ function EmployeeRow({
       >
         <Edit size={14} />
       </button>
+      <button
+        onClick={() => onDelete(employee.id)}
+        className="p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 rounded transition-all flex-shrink-0"
+      >
+        <Trash2 size={14} />
+      </button>
     </div>
   )
 }
@@ -161,19 +169,46 @@ function StructureTab({
   units,
   employees,
   onEmployeeEdit,
+  onEmployeeAdd,
+  onEmployeeDelete,
+  onUnitAdd,
 }: {
   dept: DepartmentData
   units: OrgUnit[]
   employees: OrgEmployee[]
   onEmployeeEdit: (id: string, name: string, role: string, note: string | null) => void
+  onEmployeeAdd: (name: string, role: string, note: string | null, addingTo: 'direct' | string) => void
+  onEmployeeDelete: (id: string) => void
+  onUnitAdd: () => void
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [addingTo, setAddingTo] = useState<string | null>(null)
+  const [addName, setAddName] = useState('')
+  const [addRole, setAddRole] = useState('')
+  const [addNote, setAddNote] = useState('')
 
   const directReports = employees.filter((e) => e.is_direct_report && !e.unit_id).sort((a, b) => a.sort_order - b.sort_order)
 
   const handleSave = (id: string, name: string, role: string, note: string | null) => {
     onEmployeeEdit(id, name, role, note)
     setEditingId(null)
+  }
+
+  const handleAddEmployee = () => {
+    if (addName.trim() && addingTo) {
+      onEmployeeAdd(addName, addRole, addNote || null, addingTo)
+      setAddName('')
+      setAddRole('')
+      setAddNote('')
+      setAddingTo(null)
+    }
+  }
+
+  const handleCancelAdd = () => {
+    setAddName('')
+    setAddRole('')
+    setAddNote('')
+    setAddingTo(null)
   }
 
   return (
@@ -208,11 +243,57 @@ function StructureTab({
                 employee={emp}
                 onEdit={setEditingId}
                 onSave={handleSave}
+                onDelete={onEmployeeDelete}
                 editingId={editingId}
               />
             ))}
+            {addingTo === 'direct' && (
+              <div className="py-3 px-3 bg-purple-50 border-b border-slate-100">
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={addName}
+                    onChange={(e) => setAddName(e.target.value)}
+                    placeholder="Имя сотрудника"
+                    className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    value={addRole}
+                    onChange={(e) => setAddRole(e.target.value)}
+                    placeholder="Должность"
+                    className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+                  />
+                  <input
+                    type="text"
+                    value={addNote}
+                    onChange={(e) => setAddNote(e.target.value)}
+                    placeholder="Примечание"
+                    className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+                  />
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button
+                      onClick={handleAddEmployee}
+                      className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={handleCancelAdd}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <button className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors">
+          <button
+            onClick={() => setAddingTo('direct')}
+            className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
+          >
             <Plus size={14} />
             Добавить сотрудника
           </button>
@@ -258,12 +339,58 @@ function StructureTab({
                     employee={emp}
                     onEdit={setEditingId}
                     onSave={handleSave}
+                    onDelete={onEmployeeDelete}
                     editingId={editingId}
                   />
                 ))}
+                {addingTo === unit.id && (
+                  <div className="py-3 px-3 bg-purple-50 border-b border-slate-100">
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={addName}
+                        onChange={(e) => setAddName(e.target.value)}
+                        placeholder="Имя сотрудника"
+                        className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+                        autoFocus
+                      />
+                      <input
+                        type="text"
+                        value={addRole}
+                        onChange={(e) => setAddRole(e.target.value)}
+                        placeholder="Должность"
+                        className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+                      />
+                      <input
+                        type="text"
+                        value={addNote}
+                        onChange={(e) => setAddNote(e.target.value)}
+                        placeholder="Примечание"
+                        className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+                      />
+                      <div className="flex gap-2 justify-end pt-1">
+                        <button
+                          onClick={handleAddEmployee}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={handleCancelAdd}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <button className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors">
+            <button
+              onClick={() => setAddingTo(unit.id)}
+              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
+            >
               <Plus size={14} />
               Добавить сотрудника
             </button>
@@ -273,7 +400,10 @@ function StructureTab({
 
       {/* Add sub-unit */}
       <div className="pt-4">
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
+        <button
+          onClick={onUnitAdd}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+        >
           <Plus size={16} />
           Добавить подразделение
         </button>
@@ -620,6 +750,68 @@ export default function DepartmentPage() {
     }
   }
 
+  const handleEmployeeAdd = async (name: string, role: string, note: string | null, addingTo: 'direct' | string) => {
+    const supabase = createClient()
+    const isDirectReport = addingTo === 'direct'
+
+    const { data, error } = await supabase
+      .from('org_employees')
+      .insert({
+        department_slug: slug,
+        name,
+        role,
+        note,
+        is_direct_report: isDirectReport,
+        unit_id: isDirectReport ? null : addingTo,
+        is_vacancy: false,
+        sort_order: employees.length,
+      })
+      .select()
+
+    if (!error && data && data.length > 0) {
+      setEmployees((prev) => [...prev, data[0]])
+    }
+  }
+
+  const handleEmployeeDelete = async (id: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этого сотрудника?')) {
+      return
+    }
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('org_employees')
+      .delete()
+      .eq('id', id)
+
+    if (!error) {
+      setEmployees((prev) => prev.filter((emp) => emp.id !== id))
+    }
+  }
+
+  const handleUnitAdd = async () => {
+    const unitName = prompt('Введите название подразделения:')
+    if (!unitName || !unitName.trim()) {
+      return
+    }
+
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('org_units')
+      .insert({
+        department_slug: slug,
+        name: unitName.trim(),
+        lead_name: '',
+        is_lead_vacancy: true,
+        sort_order: units.length,
+      })
+      .select()
+
+    if (!error && data && data.length > 0) {
+      setUnits((prev) => [...prev, data[0]])
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto text-center py-20">
@@ -710,7 +902,17 @@ export default function DepartmentPage() {
 
       {/* Tab Content */}
       <div className="bg-white rounded-b-lg p-6 border border-slate-200 border-t-0">
-        {activeTab === 'structure' && <StructureTab dept={dept} units={units} employees={employees} onEmployeeEdit={handleEmployeeEdit} />}
+        {activeTab === 'structure' && (
+          <StructureTab
+            dept={dept}
+            units={units}
+            employees={employees}
+            onEmployeeEdit={handleEmployeeEdit}
+            onEmployeeAdd={handleEmployeeAdd}
+            onEmployeeDelete={handleEmployeeDelete}
+            onUnitAdd={handleUnitAdd}
+          />
+        )}
         {activeTab === 'goals' && <GoalsTab slug={slug} />}
         {activeTab === 'documents' && <DocumentsTab slug={slug} />}
         {activeTab === 'services' && <ServicesTab slug={slug} />}
