@@ -1,126 +1,52 @@
 'use client'
 
 import Link from 'next/link'
-import { Plus, Heart, MessageCircle, Share2, Calendar, User } from 'lucide-react'
+import { Plus, Heart, MessageCircle, Share2, Calendar, User, Loader } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface NewsItem {
   id: string
   title: string
-  excerpt: string
-  content: string
+  excerpt: string | null
+  content: string | null
   author: string
-  publishedAt: string
-  image?: string
-  likes: number
-  comments: number
   category: string
+  published_at: string
 }
 
-const newsItems: NewsItem[] = [
-  {
-    id: 'news1',
-    title: 'Запуск нового модуля аналитики',
-    excerpt: 'Мы с гордостью представляем обновленный модуль аналитики с улучшенной визуализацией данных',
-    content: 'Новый модуль аналитики включает в себя расширенные возможности визуализации, новые метрики и интеграцию с популярными инструментами BI.',
-    author: 'Наталья Федорова',
-    publishedAt: '2024-03-25',
-    likes: 156,
-    comments: 23,
-    category: 'Product',
-  },
-  {
-    id: 'news2',
-    title: 'Talentsy выигрывает награду "Лучший SaaS в 2024"',
-    excerpt: 'Наша платформа признана лучшим решением для управления талантами в регионе',
-    content: 'На ежегодной конференции технологических компаний Talentsy получила престижную награду за инновации и качество обслуживания.',
-    author: 'Виктор Петров',
-    publishedAt: '2024-03-20',
-    likes: 342,
-    comments: 67,
-    category: 'Awards',
-  },
-  {
-    id: 'news3',
-    title: 'Открытие нового офиса в Москве',
-    excerpt: 'Мы расширяем нашу команду и открываем новый региональный офис',
-    content: 'Новый офис в Москве позволит нам лучше обслуживать наших клиентов в регионе и привлечь новые таланты.',
-    author: 'Иван Иванов',
-    publishedAt: '2024-03-15',
-    likes: 198,
-    comments: 45,
-    category: 'Company',
-  },
-  {
-    id: 'news4',
-    title: 'Серия вебинаров по лучшим практикам',
-    excerpt: 'Присоединяйтесь к нашей серии вебинаров и узнайте, как максимально использовать возможности платформы',
-    content: 'Каждую неделю мы проводим бесплатные вебинары с экспертами по управлению талантами и HR операциям.',
-    author: 'Анна Волконская',
-    publishedAt: '2024-03-10',
-    likes: 87,
-    comments: 12,
-    category: 'Learning',
-  },
-  {
-    id: 'news5',
-    title: 'Обновление безопасности и соответствие GDPR',
-    excerpt: 'Мы укрепили меры безопасности и полностью соответствуем требованиям GDPR',
-    content: 'Все данные пользователей теперь защищены с использованием современных стандартов шифрования и мы полностью соответствуем требованиям GDPR.',
-    author: 'Павел Иванов',
-    publishedAt: '2024-03-05',
-    likes: 125,
-    comments: 28,
-    category: 'Security',
-  },
-  {
-    id: 'news6',
-    title: 'Партнерство с ведущими компаниями в индустрии',
-    excerpt: 'Talentsy заключила стратегические партнерства с глобальными лидерами рынка',
-    content: 'Наши новые партнерства позволяют нам предоставлять интеграцию с лучшими инструментами и расширять экосистему для наших пользователей.',
-    author: 'Сергей Морозов',
-    publishedAt: '2024-03-01',
-    likes: 203,
-    comments: 34,
-    category: 'Partnership',
-  },
-]
-
-const categoryColors = {
-  Product: 'purple',
-  Awards: 'yellow',
-  Company: 'blue',
-  Learning: 'green',
-  Security: 'red',
-  Partnership: 'indigo',
+const categoryColors: Record<string, string> = {
+  'Продукт': 'purple',
+  'Документ': 'blue',
+  'Компания': 'green',
+  'Система': 'slate',
 }
 
 function NewsCard({ news }: { news: NewsItem }) {
-  const categoryColor = categoryColors[news.category as keyof typeof categoryColors] || 'purple'
+  const categoryColor = categoryColors[news.category] || 'slate'
 
-  const bgColor = {
+  const bgColor: Record<string, string> = {
     purple: 'bg-purple-50 text-purple-700',
-    yellow: 'bg-yellow-50 text-yellow-700',
     blue: 'bg-blue-50 text-blue-700',
     green: 'bg-green-50 text-green-700',
-    red: 'bg-red-50 text-red-700',
-    indigo: 'bg-indigo-50 text-indigo-700',
+    slate: 'bg-slate-50 text-slate-700',
   }
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${bgColor[categoryColor as keyof typeof bgColor]}`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${bgColor[categoryColor]}`}>
             {news.category}
           </span>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Calendar size={14} />
-            {new Date(news.publishedAt).toLocaleDateString('ru-RU')}
+            {new Date(news.published_at).toLocaleDateString('ru-RU')}
           </div>
         </div>
 
         <h3 className="text-xl font-bold text-slate-900 mb-2">{news.title}</h3>
-        <p className="text-slate-600 text-sm mb-4">{news.excerpt}</p>
+        <p className="text-slate-600 text-sm mb-4">{news.excerpt || news.content || ''}</p>
 
         <div className="flex items-center gap-4 pt-4 border-t border-slate-200">
           <div className="flex items-center gap-1 text-xs text-slate-600">
@@ -129,11 +55,11 @@ function NewsCard({ news }: { news: NewsItem }) {
           </div>
           <div className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer hover:text-red-600">
             <Heart size={14} />
-            {news.likes}
+            0
           </div>
           <div className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer hover:text-blue-600">
             <MessageCircle size={14} />
-            {news.comments}
+            0
           </div>
           <button className="ml-auto p-1 hover:bg-slate-100 rounded transition-colors">
             <Share2 size={14} className="text-slate-600" />
@@ -145,6 +71,37 @@ function NewsCard({ news }: { news: NewsItem }) {
 }
 
 export default function NewsPage() {
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchNews() {
+      try {
+        setLoading(true)
+        const supabase = createClient()
+
+        const { data, error: fetchError } = await supabase
+          .from('news')
+          .select('*')
+          .order('published_at', { ascending: false })
+
+        if (fetchError) {
+          setError(fetchError.message)
+          return
+        }
+
+        setNews(data || [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch news')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchNews()
+  }, [])
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
@@ -163,19 +120,45 @@ export default function NewsPage() {
         </Link>
       </div>
 
-      {/* News Feed */}
-      <div className="space-y-6">
-        {newsItems.map((news) => (
-          <NewsCard key={news.id} news={news} />
-        ))}
-      </div>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader size={32} className="text-purple-600 animate-spin" />
+        </div>
+      )}
 
-      {/* Load More */}
-      <div className="mt-12 text-center">
-        <button className="px-8 py-3 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors">
-          Загрузить еще новости
-        </button>
-      </div>
+      {/* Error State */}
+      {error && !loading && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg mb-6">
+          <p className="font-medium">Ошибка при загрузке новостей</p>
+          <p className="text-sm mt-1">{error}</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && news.length === 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-12 text-center">
+          <p className="text-slate-600 mb-2">Новостей пока нет</p>
+          <p className="text-slate-500 text-sm mb-6">
+            Создайте первую новость, нажав кнопку "Новая новость" выше
+          </p>
+          <Link href="/news/new">
+            <button className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+              <Plus size={20} />
+              Создать новость
+            </button>
+          </Link>
+        </div>
+      )}
+
+      {/* News Feed */}
+      {!loading && news.length > 0 && (
+        <div className="space-y-6">
+          {news.map((item) => (
+            <NewsCard key={item.id} news={item} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

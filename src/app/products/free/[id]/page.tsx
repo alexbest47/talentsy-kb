@@ -76,34 +76,7 @@ const TAG_CONFIG: Record<ProductTag, { label: string; color: string; icon: React
   },
 }
 
-const productDetails: Record<string, ProductDetail> = {
-  'stylist-imagemaker': { id: 'stylist-imagemaker', name: 'Стилист-имиджмейкер', tags: ['для_себя', 'для_профессии'], category: 'Стиль и имидж', siteUrl: 'https://talentsy.ru/stilist-imidzhmejker' },
-  'decorator-interior': { id: 'decorator-interior', name: 'Профессия "Декоратор интерьера"', tags: ['для_себя', 'для_профессии'], category: 'Дизайн', siteUrl: 'https://talentsy.ru/dekorator-interera' },
-  'spec-family-psychology': { id: 'spec-family-psychology', name: 'Специализация «Семейная психология»', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/spec-semejnaya-psihologiya' },
-  'family-psychologist': { id: 'family-psychologist', name: 'Профессия "Семейный психолог-консультант"', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/semejnyj-psiholog' },
-  'art-therapy-from-scratch': { id: 'art-therapy-from-scratch', name: 'Арт-терапия с нуля', tags: ['для_себя', 'для_профессии'], category: 'Арт-терапия', siteUrl: 'https://talentsy.ru/art-terapiya-s-nulya' },
-  'spec-art-therapy': { id: 'spec-art-therapy', name: 'Специализация "Арт-терапия"', tags: ['повышение_квалификации'], category: 'Арт-терапия', siteUrl: 'https://talentsy.ru/spec-art-terapiya' },
-  'art-therapist': { id: 'art-therapist', name: 'Профессия "Арт-терапевт"', tags: ['для_профессии'], category: 'Арт-терапия', siteUrl: 'https://talentsy.ru/art-terapevt' },
-  'child-psychology-parents': { id: 'child-psychology-parents', name: 'Детская психология: курс для родителей и всех интересующихся', tags: ['для_себя'], category: 'Психология', siteUrl: 'https://talentsy.ru/detskaya-psihologiya-dlya-roditelej' },
-  'spec-child-psychology': { id: 'spec-child-psychology', name: 'Специализация "Детская психология"', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/spec-detskaya-psihologiya' },
-  'sexual-relations-course': { id: 'sexual-relations-course', name: 'Практическая психология сексуальных отношений', tags: ['для_себя'], category: 'Психология', siteUrl: 'https://talentsy.ru/psihologiya-seksualnyh-otnoshenij' },
-  'spec-sexual-relations': { id: 'spec-sexual-relations', name: 'Специализация «Консультант в сфере сексуальных отношений»', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/spec-konsultant-seksualnyh-otnoshenij' },
-  'sexual-relations-consultant': { id: 'sexual-relations-consultant', name: 'Профессия «Консультант в сфере сексуальных отношений»', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/konsultant-seksualnyh-otnoshenij' },
-  'spec-gestalt': { id: 'spec-gestalt', name: 'Специализация "Гештальт-терапия"', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/spec-geshtalt-terapiya' },
-  'gestalt-therapist': { id: 'gestalt-therapist', name: 'Профессия "Гештальт-терапевт"', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/geshtalt-terapevt' },
-  'spec-cbt': { id: 'spec-cbt', name: 'Специализация "Когнитивно-поведенческая терапия"', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/spec-kpt' },
-  'cbt-therapist': { id: 'cbt-therapist', name: 'Профессия "КПТ-терапевт"', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/kpt-terapevt' },
-  'psychologist-consultant': { id: 'psychologist-consultant', name: 'Профессия "Психолог-консультант"', tags: ['для_профессии', 'для_себя'], category: 'Психология', siteUrl: 'https://talentsy.ru/psiholog-konsultant' },
-  'child-psychologist': { id: 'child-psychologist', name: 'Профессия "Детский Психолог-Консультант"', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/detskij-psiholog' },
-  'coaching': { id: 'coaching', name: 'Коучинг', tags: ['для_профессии', 'для_себя'], category: 'Психология', siteUrl: 'https://talentsy.ru/kouching' },
-  'crisis-counseling': { id: 'crisis-counseling', name: 'Кризисное консультирование', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/krizisnoe-konsultirovanie' },
-  'orkt': { id: 'orkt', name: 'ОРКТ', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/orkt' },
-  'personal-therapy': { id: 'personal-therapy', name: 'Обучающая личная терапия', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/obuchayushchaya-lichnaya-terapiya' },
-  'pdzhk': { id: 'pdzhk', name: 'ПДЖК', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/pdzhk' },
-  'fashion-designer': { id: 'fashion-designer', name: 'Профессия "Дизайнер одежды"', tags: ['для_профессии'], category: 'Дизайн', siteUrl: 'https://talentsy.ru/dizajner-odezhdy' },
-  'nutritionist': { id: 'nutritionist', name: 'Профессия "Интегративный нутрициолог"', tags: ['для_профессии'], category: 'Здоровье', siteUrl: 'https://talentsy.ru/nutriciolog' },
-  'supervision': { id: 'supervision', name: 'Супервизия', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/superviziya' },
-}
+const productDetails: Record<string, ProductDetail> = {}
 
 // ========== HELPERS ==========
 
@@ -713,15 +686,15 @@ export default function ProductDetailPage() {
     return (
       <div className="max-w-4xl mx-auto text-center py-20">
         <p className="text-slate-400 text-lg mb-4">Продукт не найден</p>
-        <Link href="/products/paid" className="text-purple-600 hover:text-purple-700 font-medium text-sm">← Вернуться к списку программ</Link>
+        <Link href="/products/free" className="text-purple-600 hover:text-purple-700 font-medium text-sm">← Назад к бесплатным продуктам</Link>
       </div>
     )
   }
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Link href="/products/paid" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-6">
-        <ArrowLeft size={16} /> Назад к платным программам
+      <Link href="/products/free" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-6">
+        <ArrowLeft size={16} /> Назад к бесплатным продуктам
       </Link>
 
       {/* Header */}

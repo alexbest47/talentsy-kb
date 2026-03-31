@@ -27,6 +27,92 @@ interface EditingGoal {
   metric: string | null;
 }
 
+// All roles from org structure for dropdown
+const ALL_ROLES: { name: string; position: string; department: string }[] = [
+  // CEO
+  { name: 'Кузьмин Александр Викторович', position: 'CEO', department: 'Руководство' },
+  // Sales
+  { name: 'Подколзин Евгений', position: 'Директор по продажам', department: 'Продажи' },
+  { name: 'Краснов Денис Вячеславович', position: 'Проджект-менеджер продаж', department: 'Продажи' },
+  { name: 'Осипова Анна Алексеевна', position: 'Тренер по продажам', department: 'Продажи' },
+  { name: 'Кузьмина Марина Владимировна', position: 'Руководитель ОКК', department: 'Продажи' },
+  { name: 'Полозова Анастасия Николаевна', position: 'Руководитель ОП №1', department: 'Продажи' },
+  // Marketing
+  { name: 'Грачев Максим Павлович', position: 'Руководитель Performance', department: 'Маркетинг' },
+  { name: 'Любовцева Ольга Константиновна', position: 'Таргетолог', department: 'Маркетинг' },
+  { name: 'Соколов Александр Дмитриевич', position: 'Проджект-менеджер', department: 'Маркетинг' },
+  { name: 'Шумова Алена Юрьевна', position: 'Продуктовый маркетолог', department: 'Маркетинг' },
+  { name: 'Тюрина Екатерина Глебовна', position: 'Веб-дизайнер', department: 'Маркетинг' },
+  { name: 'Лаптев Дмитрий Александрович', position: 'Верстальщик', department: 'Маркетинг' },
+  { name: 'Апекаловский Даниил Эрастович', position: 'Верстальщик писем', department: 'Маркетинг' },
+  { name: 'Дерфель Ксения Юрьевна', position: 'CRM-маркетолог', department: 'Маркетинг' },
+  { name: 'Харитонова Ксения Валерьевна', position: 'Руководитель SMM', department: 'Маркетинг' },
+  { name: 'Мингазова Диана Равилевна', position: 'SMM-менеджер', department: 'Маркетинг' },
+  { name: 'Мураева Оксана Алексеевна', position: 'Дизайнер', department: 'Маркетинг' },
+  // Tech
+  { name: 'Скляров Сергей Дмитриевич', position: 'Руководитель тех. отдела', department: 'Технический' },
+  { name: 'Цветков Василий Алексеевич', position: 'Разработчик-программист', department: 'Технический' },
+  { name: 'Зайнутдинов Анатолий Атласович', position: 'Технический специалист', department: 'Технический' },
+  // Product
+  { name: 'Носко Анна Владимировна', position: 'Директор по продукту', department: 'Продукт' },
+  { name: 'Панченко Полина Борисовна', position: 'Руководитель академического отдела', department: 'Продукт' },
+  { name: 'Петрова Анастасия Олеговна', position: 'Руководитель сопровождения', department: 'Продукт' },
+  { name: 'Шатунова Наталья Мансуровна', position: 'Руководитель Психология', department: 'Продукт' },
+  { name: 'Артамонова Алина Анатольевна', position: 'Руководитель контентных воронок', department: 'Продукт' },
+  { name: 'Луканенкова Мила Анатольевна', position: 'Архитектор сообществ', department: 'Продукт' },
+  // Admin
+  { name: 'Бортник Валерия Александровна', position: 'Руководитель администрации', department: 'Администрация' },
+  { name: 'Ибрагимов Александр Энверович', position: 'Юрист', department: 'Администрация' },
+  // HR
+  { name: 'Немченко Денис Игоревич', position: 'HR директор', department: 'HR' },
+  { name: 'Бурамбаев Бауржан Аманатович', position: 'Специалист по подбору', department: 'HR' },
+  { name: 'Патова Аида Рамазановна', position: 'Специалист по кадровому учету', department: 'HR' },
+  // Finance
+  { name: 'Каневская Елена Викторовна', position: 'Финансовый директор', department: 'Финансы' },
+  { name: 'Каневский Дмитрий Александрович', position: 'Бухгалтер', department: 'Финансы' },
+  // COO
+  { name: 'COO (вакансия)', position: 'Операционный директор', department: 'Руководство' },
+];
+
+// Group roles by department for the dropdown
+const rolesByDepartment = ALL_ROLES.reduce((acc, r) => {
+  if (!acc[r.department]) acc[r.department] = [];
+  acc[r.department].push(r);
+  return acc;
+}, {} as Record<string, typeof ALL_ROLES>);
+
+function RoleSelect({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  className?: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={clsx(
+        'w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white',
+        className
+      )}
+    >
+      <option value="">— выберите ответственного —</option>
+      {Object.entries(rolesByDepartment).map(([dept, roles]) => (
+        <optgroup key={dept} label={dept}>
+          {roles.map((r) => (
+            <option key={r.name} value={r.name}>
+              {r.name} — {r.position}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
 export default function GoalsPage() {
   const supabase = createClient();
 
@@ -51,7 +137,6 @@ export default function GoalsPage() {
   const [newQuarter, setNewQuarter] = useState('');
   const [showNewQuarterInput, setShowNewQuarterInput] = useState(false);
 
-  // Fetch all goals and extract unique quarters
   useEffect(() => {
     const fetchGoals = async () => {
       try {
@@ -66,20 +151,17 @@ export default function GoalsPage() {
 
         setGoals(data || []);
 
-        // Extract unique quarters
         const uniqueQuarters = Array.from(
           new Set((data || []).map(g => g.quarter))
         ).sort().reverse();
 
         setQuarters(uniqueQuarters);
 
-        // Extract unique departments
         const uniqueDepartments = Array.from(
           new Set((data || []).map(g => g.department))
         ).sort();
         setDepartments(uniqueDepartments);
 
-        // Set selected quarter to the first one or a default
         if (uniqueQuarters.length > 0) {
           setSelectedQuarter(uniqueQuarters[0]);
         }
@@ -93,7 +175,6 @@ export default function GoalsPage() {
     fetchGoals();
   }, [supabase]);
 
-  // Group goals by department for selected quarter
   const groupedGoals = goals
     .filter(g => g.quarter === selectedQuarter)
     .reduce((acc, goal) => {
@@ -134,7 +215,6 @@ export default function GoalsPage() {
 
       if (insertError) throw insertError;
 
-      // Refresh goals
       const { data } = await supabase
         .from('goals')
         .select('*')
@@ -143,7 +223,6 @@ export default function GoalsPage() {
 
       setGoals(data || []);
 
-      // Update departments list
       const uniqueDepartments = Array.from(
         new Set((data || []).map(g => g.department))
       ).sort();
@@ -187,7 +266,6 @@ export default function GoalsPage() {
 
       if (updateError) throw updateError;
 
-      // Refresh goals
       const { data } = await supabase
         .from('goals')
         .select('*')
@@ -204,9 +282,7 @@ export default function GoalsPage() {
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (!confirm('Вы уверены, что хотите удалить эту цель?')) {
-      return;
-    }
+    if (!confirm('Вы уверены, что хотите удалить эту цель?')) return;
 
     try {
       const { error: deleteError } = await supabase
@@ -215,7 +291,6 @@ export default function GoalsPage() {
         .eq('id', id);
 
       if (deleteError) throw deleteError;
-
       setGoals(goals.filter(g => g.id !== id));
       setError('');
     } catch (err) {
@@ -228,8 +303,6 @@ export default function GoalsPage() {
       setError('Введите квартал в формате Q1-2026');
       return;
     }
-
-    // Just select the new quarter - it will be created when a goal is added
     setSelectedQuarter(newQuarter);
     if (!quarters.includes(newQuarter)) {
       setQuarters([...quarters, newQuarter].sort().reverse());
@@ -241,10 +314,8 @@ export default function GoalsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-slate-600">Загрузка...</p>
-          </div>
+        <div className="max-w-6xl mx-auto flex items-center justify-center h-64">
+          <p className="text-slate-600">Загрузка...</p>
         </div>
       </div>
     );
@@ -253,21 +324,15 @@ export default function GoalsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header with back link */}
-        <Link
-          href="/admin"
-          className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6 font-medium"
-        >
+        <Link href="/admin" className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6 font-medium">
           ← Назад к администрированию
         </Link>
 
-        {/* Page Title */}
         <div className="flex items-center gap-3 mb-8">
           <Target className="w-8 h-8 text-purple-600" />
           <h1 className="text-3xl font-bold text-slate-900">Управление целями</h1>
         </div>
 
-        {/* Error message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {error}
@@ -278,8 +343,6 @@ export default function GoalsPage() {
         <div className="mb-8 bg-white border border-slate-200 rounded-lg p-6">
           <div className="flex flex-wrap items-center gap-3">
             <label className="font-medium text-slate-700">Квартал:</label>
-
-            {/* Quarter buttons */}
             <div className="flex flex-wrap gap-2">
               {quarters.map(q => (
                 <button
@@ -297,7 +360,6 @@ export default function GoalsPage() {
               ))}
             </div>
 
-            {/* New quarter button */}
             {!showNewQuarterInput ? (
               <button
                 onClick={() => setShowNewQuarterInput(true)}
@@ -310,24 +372,13 @@ export default function GoalsPage() {
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="Q1-2026"
+                  placeholder="Q2-2026"
                   value={newQuarter}
                   onChange={e => setNewQuarter(e.target.value)}
                   className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
-                <button
-                  onClick={handleCreateQuarter}
-                  className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  OK
-                </button>
-                <button
-                  onClick={() => {
-                    setShowNewQuarterInput(false);
-                    setNewQuarter('');
-                  }}
-                  className="p-2 text-slate-500 hover:text-slate-700"
-                >
+                <button onClick={handleCreateQuarter} className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">OK</button>
+                <button onClick={() => { setShowNewQuarterInput(false); setNewQuarter(''); }} className="p-2 text-slate-500 hover:text-slate-700">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -339,16 +390,11 @@ export default function GoalsPage() {
         {departmentsSorted.length > 0 ? (
           <div className="space-y-6 mb-8">
             {departmentsSorted.map(department => (
-              <div
-                key={department}
-                className="bg-white border border-slate-200 rounded-lg overflow-hidden"
-              >
-                {/* Department header */}
+              <div key={department} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="bg-gradient-to-r from-purple-50 to-slate-50 px-6 py-4 border-b border-slate-200">
                   <h2 className="text-lg font-bold text-slate-900">{department}</h2>
                 </div>
 
-                {/* Goals list */}
                 <div className="divide-y divide-slate-200">
                   {groupedGoals[department]?.map(goal => (
                     <div
@@ -359,129 +405,76 @@ export default function GoalsPage() {
                       )}
                     >
                       {editingId === goal.id && editingGoal ? (
-                        // Edit mode
                         <div className="space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Отдел
-                              </label>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Отдел</label>
                               <input
                                 type="text"
                                 value={editingGoal.department}
-                                onChange={e =>
-                                  setEditingGoal({
-                                    ...editingGoal,
-                                    department: e.target.value
-                                  })
-                                }
+                                onChange={e => setEditingGoal({ ...editingGoal, department: e.target.value })}
                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Роль (опционально)
-                              </label>
-                              <input
-                                type="text"
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Ответственный</label>
+                              <RoleSelect
                                 value={editingGoal.role || ''}
-                                onChange={e =>
-                                  setEditingGoal({
-                                    ...editingGoal,
-                                    role: e.target.value || null
-                                  })
-                                }
-                                placeholder="например, Senior Developer"
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                onChange={(val) => setEditingGoal({ ...editingGoal, role: val || null })}
                               />
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Текст цели
-                            </label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Текст цели</label>
                             <textarea
                               value={editingGoal.text}
-                              onChange={e =>
-                                setEditingGoal({
-                                  ...editingGoal,
-                                  text: e.target.value
-                                })
-                              }
+                              onChange={e => setEditingGoal({ ...editingGoal, text: e.target.value })}
                               rows={3}
                               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Метрика (опционально)
-                            </label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Метрика (опционально)</label>
                             <input
                               type="text"
                               value={editingGoal.metric || ''}
-                              onChange={e =>
-                                setEditingGoal({
-                                  ...editingGoal,
-                                  metric: e.target.value || null
-                                })
-                              }
+                              onChange={e => setEditingGoal({ ...editingGoal, metric: e.target.value || null })}
                               placeholder="например, +15%"
                               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
                           </div>
 
                           <div className="flex items-center gap-3 pt-2">
-                            <button
-                              onClick={handleSaveEdit}
-                              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                            >
-                              <Save className="w-4 h-4" />
-                              Сохранить
+                            <button onClick={handleSaveEdit} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                              <Save className="w-4 h-4" /> Сохранить
                             </button>
-                            <button
-                              onClick={() => {
-                                setEditingId(null);
-                                setEditingGoal(null);
-                              }}
-                              className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
-                            >
+                            <button onClick={() => { setEditingId(null); setEditingGoal(null); }} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors">
                               Отмена
                             </button>
                           </div>
                         </div>
                       ) : (
-                        // View mode
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <p className="text-slate-900 font-medium mb-2">{goal.text}</p>
                             {goal.role && (
                               <p className="text-sm text-slate-600 mb-2">
-                                <span className="font-medium">Роль:</span> {goal.role}
+                                <span className="font-medium">Ответственный:</span> {goal.role}
                               </p>
                             )}
                             {goal.metric && (
-                              <div className="inline-block">
-                                <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                                  {goal.metric}
-                                </span>
-                              </div>
+                              <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                                {goal.metric}
+                              </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleStartEdit(goal)}
-                              className="p-2 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                              title="Редактировать"
-                            >
+                            <button onClick={() => handleStartEdit(goal)} className="p-2 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Редактировать">
                               <Edit3 className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteGoal(goal.id)}
-                              className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Удалить"
-                            >
+                            <button onClick={() => handleDeleteGoal(goal.id)} className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Удалить">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -504,14 +497,13 @@ export default function GoalsPage() {
           </div>
         )}
 
-        {/* Add new goal section */}
+        {/* Add new goal */}
         {!isAddingGoal ? (
           <button
             onClick={() => setIsAddingGoal(true)}
             className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
           >
-            <Plus className="w-5 h-5" />
-            Добавить цель
+            <Plus className="w-5 h-5" /> Добавить цель
           </button>
         ) : (
           <div className="bg-white border border-slate-200 rounded-lg p-6">
@@ -520,9 +512,7 @@ export default function GoalsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Отдел *
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Отдел *</label>
                   <input
                     type="text"
                     list="departments-list"
@@ -539,23 +529,16 @@ export default function GoalsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Роль (опционально)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="например, Senior Developer"
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Ответственный</label>
+                  <RoleSelect
                     value={newGoal.role}
-                    onChange={e => setNewGoal({ ...newGoal, role: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    onChange={(val) => setNewGoal({ ...newGoal, role: val })}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Текст цели *
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Текст цели *</label>
                 <textarea
                   placeholder="опишите цель для этого квартала"
                   value={newGoal.text}
@@ -566,9 +549,7 @@ export default function GoalsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Метрика (опционально)
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Метрика (опционально)</label>
                 <input
                   type="text"
                   placeholder="например, +15%, 5 экспортов, 100 часов обучения"
@@ -583,14 +564,10 @@ export default function GoalsPage() {
                   onClick={handleAddGoal}
                   className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
                 >
-                  <Save className="w-4 h-4" />
-                  Добавить цель
+                  <Save className="w-4 h-4" /> Добавить цель
                 </button>
                 <button
-                  onClick={() => {
-                    setIsAddingGoal(false);
-                    setNewGoal({ department: '', role: '', text: '', metric: '' });
-                  }}
+                  onClick={() => { setIsAddingGoal(false); setNewGoal({ department: '', role: '', text: '', metric: '' }); }}
                   className="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
                 >
                   Отмена

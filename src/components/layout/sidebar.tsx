@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Home,
   Building2,
   Package,
   Users,
@@ -69,9 +68,9 @@ export default function Sidebar() {
   const navSections: NavSection[] = [
     {
       id: 'home',
-      label: 'Главная',
-      icon: <Home size={20} />,
-      href: '/',
+      label: 'Новости',
+      icon: <Newspaper size={20} />,
+      href: '/news',
     },
     {
       id: 'general',
@@ -121,12 +120,6 @@ export default function Sidebar() {
       label: 'Документы',
       icon: <FileText size={20} />,
       href: '/docs',
-    },
-    {
-      id: 'news',
-      label: 'Новости',
-      icon: <Newspaper size={20} />,
-      href: '/news',
     },
     {
       id: 'admin',
