@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, X, ExternalLink, Loader, Edit3, ArrowLeft } from 'lucide-react'
+import { Search, Plus, X, ExternalLink, Loader, Edit3, ArrowLeft, ImagePlus } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
 
@@ -21,6 +21,7 @@ interface DbProduct {
   site_url: string
   product_type: string
   status: string
+  image_url: string
   created_at: string
   updated_at: string
 }
@@ -83,6 +84,11 @@ function CategoryBadge({ category }: { category: string }) {
 function ProductCard({ product, subcategory }: { product: ProductWithTags; subcategory: string }) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden hover:shadow-lg hover:border-purple-300 transition-all duration-200 h-full flex flex-col">
+      {product.image_url && (
+        <div className="w-full aspect-square bg-slate-100 overflow-hidden">
+          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+        </div>
+      )}
       <div className="p-5 flex flex-col flex-1">
         <div className="flex flex-wrap gap-1.5 mb-3">
           {product.tags.length > 0 ? (
@@ -145,8 +151,23 @@ function CreateProductModal({
     siteUrl: '',
     description: '',
   })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Пожалуйста, выберите изображение (PNG, JPG, WebP)')
+      return
+    }
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -163,6 +184,24 @@ function CreateProductModal({
       const slug = transliterateToSlug(formData.name)
       const supabase = createClient()
 
+      // Upload image if provided
+      let imageUrl = ''
+      if (imageFile) {
+        const ext = imageFile.name.split('.').pop() || 'png'
+        const storagePath = `diagnostics/${slug}.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(storagePath, imageFile, { upsert: true })
+        if (uploadError) {
+          console.error('Image upload error:', uploadError)
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(storagePath)
+          imageUrl = publicUrlData.publicUrl
+        }
+      }
+
       const { error: insertError } = await supabase.from('products').insert([
         {
           slug,
@@ -172,6 +211,7 @@ function CreateProductModal({
           site_url: formData.siteUrl,
           product_type: 'free',
           status: 'active',
+          image_url: imageUrl,
         },
       ])
 
@@ -181,11 +221,9 @@ function CreateProductModal({
         return
       }
 
-      setFormData({
-        name: '',
-        siteUrl: '',
-        description: '',
-      })
+      setFormData({ name: '', siteUrl: '', description: '' })
+      setImageFile(null)
+      setImagePreview(null)
       onSuccess()
       onClose()
     } catch (err) {
@@ -199,7 +237,7 @@ function CreateProductModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+      <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <h2 className="text-lg font-bold text-slate-900">Добавить программу</h2>
           <button
@@ -228,6 +266,33 @@ function CreateProductModal({
               placeholder="Введите название"
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Изображение (квадратное)
+            </label>
+            <div className="flex items-center gap-4">
+              {imagePreview ? (
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 flex-shrink-0">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImageFile(null); setImagePreview(null) }}
+                    className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 hover:border-purple-400 cursor-pointer transition-colors flex-shrink-0">
+                  <ImagePlus size={20} className="text-slate-400" />
+                  <span className="text-[10px] text-slate-400 mt-1">Загрузить</span>
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                </label>
+              )}
+              <p className="text-xs text-slate-400">PNG, JPG или WebP. Рекомендуется квадратное изображение.</p>
+            </div>
           </div>
 
           <div>

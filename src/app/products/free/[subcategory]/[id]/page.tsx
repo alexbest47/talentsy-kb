@@ -209,7 +209,8 @@ function DocEditorModal({
   const [title, setTitle] = useState(initialDoc?.title || '')
   const [access, setAccess] = useState<DocAccess>(initialDoc?.access || 'internal')
   const [content, setContent] = useState<any>(initialDoc?.content || null)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setSaveError] = useState('')
 
   // Refs for auto-save (avoid closures capturing stale state)
   const titleRef = useRef(title)
@@ -242,6 +243,7 @@ function DocEditorModal({
 
     savingRef.current = true
     setSaveStatus('saving')
+    setSaveError('')
 
     try {
       const supabase = createClient()
@@ -257,7 +259,7 @@ function DocEditorModal({
 
       if (docIdRef.current) {
         // UPDATE existing
-        await supabase
+        const { error: updateError } = await supabase
           .from('documents')
           .update({
             title: titleRef.current.trim(),
@@ -269,9 +271,16 @@ function DocEditorModal({
             updated_at: new Date().toISOString(),
           })
           .eq('id', docIdRef.current)
+
+        if (updateError) {
+          console.error('Update error:', updateError)
+          setSaveStatus('error')
+          setSaveError(updateError.message)
+          return
+        }
       } else {
         // INSERT new — let Supabase generate UUID
-        const { data: inserted } = await supabase
+        const { data: inserted, error: insertError } = await supabase
           .from('documents')
           .insert({
             title: titleRef.current.trim(),
@@ -284,6 +293,13 @@ function DocEditorModal({
           })
           .select()
           .single()
+
+        if (insertError) {
+          console.error('Insert error:', insertError)
+          setSaveStatus('error')
+          setSaveError(insertError.message)
+          return
+        }
 
         if (inserted) {
           docIdRef.current = inserted.id
@@ -298,6 +314,8 @@ function DocEditorModal({
       saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (err) {
       console.error('Auto-save error:', err)
+      setSaveStatus('error')
+      setSaveError(err instanceof Error ? err.message : 'Неизвестная ошибка')
     } finally {
       savingRef.current = false
     }
@@ -362,6 +380,11 @@ function DocEditorModal({
                 Сохранено
               </span>
             )}
+            {saveStatus === 'error' && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded bg-red-100 text-red-600" title={saveError}>
+                Ошибка сохранения
+              </span>
+            )}
           </div>
           <button onClick={handleClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
         </div>
@@ -402,7 +425,21 @@ function DocEditorModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+        {saveError && (
+          <div className="mx-6 mb-0 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+            Ошибка: {saveError}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+          <button
+            onClick={() => saveToSupabase()}
+            disabled={saveStatus === 'saving' || !title.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Save size={16} />
+            {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить'}
+          </button>
           <button onClick={handleClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">Закрыть</button>
         </div>
       </div>
