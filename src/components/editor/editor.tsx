@@ -11,10 +11,10 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlock from '@tiptap/extension-code-block'
 import Underline from '@tiptap/extension-underline'
-import { TextStyle } from '@tiptap/extension-text-style'
-import { FontSize as TiptapFontSize } from '@tiptap/extension-text-style'
+import TextStyle from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import Highlight from '@tiptap/extension-highlight'
+import { FontSize } from './font-size'
 import Toolbar from './toolbar'
 import clsx from 'clsx'
 
@@ -52,7 +52,7 @@ export default function Editor({ content, onUpdate, editable = true }: EditorPro
       Highlight.configure({
         multicolor: true,
       }),
-      TiptapFontSize,
+      FontSize,
     ],
     content: content || '',
     editable,

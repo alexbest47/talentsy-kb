@@ -191,7 +191,7 @@ function FontSizeDropdown({
             <button
               key={value}
               onClick={() => {
-                editor.chain().focus().setFontSize(value).run()
+                editor.chain().focus().setMark('textStyle', { fontSize: value }).run()
                 setOpen(false)
               }}
               className={clsx(
@@ -205,7 +205,7 @@ function FontSizeDropdown({
           <div className="border-t border-slate-100 mt-1 pt-1">
             <button
               onClick={() => {
-                editor.chain().focus().unsetFontSize().run()
+                editor.chain().focus().removeEmptyTextStyle().run()
                 setOpen(false)
               }}
               className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700"
