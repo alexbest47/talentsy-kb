@@ -129,11 +129,11 @@ export default function Editor({ content, onUpdate, editable = true }: EditorPro
   return (
     <div className="flex flex-col h-full">
       {editable && <Toolbar editor={editor} />}
-      <div className={clsx('flex-1 overflow-y-auto', editable && 'bg-white border border-slate-200')}>
+      <div className={clsx('flex-1 overflow-y-auto', editable && 'bg-white')}>
         <EditorContent
           editor={editor}
           className={clsx(
-            'prose prose-sm max-w-none px-6 py-4 focus-visible:outline-none',
+            'prose prose-sm max-w-none px-6 py-4',
             '[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6',
             '[&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-3 [&_td]:py-2 [&_th]:border [&_th]:border-slate-300 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-slate-100 [&_th]:font-bold',
             '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg',

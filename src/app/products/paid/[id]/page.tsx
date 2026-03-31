@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -222,32 +222,94 @@ function DocEditorModal({
   const [title, setTitle] = useState(initialDoc?.title || '')
   const [access, setAccess] = useState<DocAccess>(initialDoc?.access || 'internal')
   const [content, setContent] = useState<any>(initialDoc?.content || null)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'new'>( isNew ? 'new' : 'saved')
+  const [hasSavedOnce, setHasSavedOnce] = useState(!isNew)
 
-  const handleSave = () => {
-    if (!title.trim()) return
+  // Refs to track latest values for auto-save interval
+  const titleRef = useRef(title)
+  const contentRef = useRef(content)
+  const accessRef = useRef(access)
+  const hasSavedOnceRef = useRef(hasSavedOnce)
+  const docIdRef = useRef(initialDoc?.id || '')
+  const dirtyRef = useRef(false)
 
-    const docData: DocItem = {
-      id: initialDoc?.id || generateId(),
-      title: title.trim(),
-      content,
+  titleRef.current = title
+  contentRef.current = content
+  accessRef.current = access
+  hasSavedOnceRef.current = hasSavedOnce
+
+  // Mark dirty on changes
+  useEffect(() => {
+    if (hasSavedOnce || !isNew) {
+      dirtyRef.current = true
+      setSaveStatus('unsaved')
+    }
+  }, [title, content, access])
+
+  const buildDocData = useCallback((): DocItem => {
+    return {
+      id: docIdRef.current || generateId(),
+      title: titleRef.current.trim(),
+      content: contentRef.current,
       category: defaultCategory,
-      access,
-      share_token: access === 'external' ? (initialDoc?.share_token || generateShareToken()) : null,
+      access: accessRef.current,
+      share_token: accessRef.current === 'external' ? (initialDoc?.share_token || generateShareToken()) : null,
       author: initialDoc?.author || 'Администратор',
       product_id: productId,
       created_at: initialDoc?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+  }, [defaultCategory, productId, initialDoc])
+
+  const handleSave = () => {
+    if (!title.trim()) return
+    const docData = buildDocData()
     onSave(docData)
+    docIdRef.current = docData.id
+    setHasSavedOnce(true)
+    dirtyRef.current = false
+    setSaveStatus('saved')
   }
+
+  // Auto-save every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (dirtyRef.current && titleRef.current.trim()) {
+        setSaveStatus('saving')
+        const docData = buildDocData()
+        onSave(docData)
+        docIdRef.current = docData.id
+        setHasSavedOnce(true)
+        hasSavedOnceRef.current = true
+        dirtyRef.current = false
+        setTimeout(() => setSaveStatus('saved'), 500)
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [buildDocData, onSave])
+
+  const statusLabel = saveStatus === 'saving' ? 'Сохранение...' : saveStatus === 'saved' ? 'Сохранено' : saveStatus === 'unsaved' ? 'Не сохранено' : ''
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">
-            {isNew ? 'Новый документ' : 'Редактировать документ'}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-slate-900">
+              {isNew && !hasSavedOnce ? 'Новый документ' : 'Редактировать документ'}
+            </h2>
+            {saveStatus !== 'new' && (
+              <span className={clsx(
+                'text-xs font-medium px-2 py-0.5 rounded',
+                saveStatus === 'saved' && 'bg-green-100 text-green-600',
+                saveStatus === 'saving' && 'bg-yellow-100 text-yellow-600',
+                saveStatus === 'unsaved' && 'bg-slate-100 text-slate-500',
+              )}>
+                {statusLabel}
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
         </div>
 
@@ -288,10 +350,10 @@ function DocEditorModal({
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">Отмена</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">Закрыть</button>
           <button onClick={handleSave} disabled={!title.trim()} className="inline-flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium transition-colors">
             <Save size={16} />
-            {isNew ? 'Создать' : 'Сохранить'}
+            Сохранить сейчас
           </button>
         </div>
       </div>

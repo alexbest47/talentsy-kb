@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ArrowLeft, Save, Lock, Unlock } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -40,7 +40,29 @@ export default function EditDocPage() {
   const [content, setContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const [shareToken, setShareToken] = useState<string | null>(null)
+
+  const titleRef = useRef(title)
+  const contentRef = useRef(content)
+  const categoryRef = useRef(category)
+  const accessRef = useRef(access)
+  const shareTokenRef = useRef(shareToken)
+  const dirtyRef = useRef(false)
+  const initialLoadRef = useRef(true)
+
+  titleRef.current = title
+  contentRef.current = content
+  categoryRef.current = category
+  accessRef.current = access
+  shareTokenRef.current = shareToken
+
+  // Mark dirty on changes (skip initial load)
+  useEffect(() => {
+    if (initialLoadRef.current) return
+    dirtyRef.current = true
+    setSaveStatus('unsaved')
+  }, [title, content, category, access])
 
   useEffect(() => {
     fetchDocument()
@@ -68,27 +90,30 @@ export default function EditDocPage() {
       console.error('Error fetching document:', error)
     } finally {
       setLoading(false)
+      // Allow dirty tracking after initial load settles
+      setTimeout(() => { initialLoadRef.current = false }, 500)
     }
   }
 
-  const handleSave = async () => {
-    if (!title.trim()) return
+  const doSave = useCallback(async (redirect = false) => {
+    if (!titleRef.current.trim()) return
 
     setSaving(true)
+    setSaveStatus('saving')
     try {
       const supabase = createClient()
 
-      const newShareToken = access === 'external' && !shareToken
+      const newShareToken = accessRef.current === 'external' && !shareTokenRef.current
         ? 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-        : shareToken
+        : shareTokenRef.current
 
       const { error } = await supabase
         .from('documents')
         .update({
-          title,
-          content,
-          category,
-          access,
+          title: titleRef.current,
+          content: contentRef.current,
+          category: categoryRef.current,
+          access: accessRef.current,
           share_token: newShareToken,
           updated_at: new Date().toISOString(),
         })
@@ -96,13 +121,30 @@ export default function EditDocPage() {
 
       if (error) throw error
 
-      router.push(`/docs/${id}`)
+      dirtyRef.current = false
+      setSaveStatus('saved')
+
+      if (redirect) {
+        router.push(`/docs/${id}`)
+      }
     } catch (error) {
       console.error('Error updating document:', error)
     } finally {
       setSaving(false)
     }
-  }
+  }, [id, router])
+
+  const handleSave = () => doSave(true)
+
+  // Auto-save every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (dirtyRef.current && titleRef.current.trim()) {
+        doSave(false)
+      }
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [doSave])
 
   if (loading) {
     return (
@@ -124,6 +166,16 @@ export default function EditDocPage() {
           </button>
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">Редактировать документ</h1>
+        {saveStatus !== 'saved' || saving ? (
+          <span className={clsx(
+            'text-xs font-medium px-2 py-0.5 rounded',
+            saveStatus === 'saved' && 'bg-green-100 text-green-600',
+            saveStatus === 'saving' && 'bg-yellow-100 text-yellow-600',
+            saveStatus === 'unsaved' && 'bg-slate-100 text-slate-500',
+          )}>
+            {saveStatus === 'saving' ? 'Сохранение...' : saveStatus === 'saved' ? 'Сохранено' : 'Не сохранено'}
+          </span>
+        ) : null}
       </div>
 
       <div className="space-y-5">

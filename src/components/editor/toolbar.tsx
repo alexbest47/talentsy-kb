@@ -25,6 +25,10 @@ import {
   Highlighter,
   Type,
   ChevronDown,
+  Columns,
+  Rows,
+  Trash2,
+  Plus,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -283,6 +287,58 @@ function TableSizePicker({ editor }: { editor: Editor }) {
   )
 }
 
+function TableContextToolbar({ editor }: { editor: Editor }) {
+  if (!editor.isActive('table')) return null
+
+  return (
+    <div className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 border-t border-blue-200">
+      <span className="text-xs text-blue-600 font-medium mr-2">Таблица:</span>
+      <button
+        onClick={() => editor.chain().focus().addColumnAfter().run()}
+        title="Добавить столбец"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+      >
+        <Plus size={12} />
+        <Columns size={12} />
+      </button>
+      <button
+        onClick={() => editor.chain().focus().addRowAfter().run()}
+        title="Добавить строку"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+      >
+        <Plus size={12} />
+        <Rows size={12} />
+      </button>
+      <div className="w-px h-4 bg-blue-200 mx-1" />
+      <button
+        onClick={() => editor.chain().focus().deleteColumn().run()}
+        title="Удалить столбец"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+      >
+        <Trash2 size={12} />
+        <Columns size={12} />
+      </button>
+      <button
+        onClick={() => editor.chain().focus().deleteRow().run()}
+        title="Удалить строку"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+      >
+        <Trash2 size={12} />
+        <Rows size={12} />
+      </button>
+      <div className="w-px h-4 bg-blue-200 mx-1" />
+      <button
+        onClick={() => editor.chain().focus().deleteTable().run()}
+        title="Удалить таблицу"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+      >
+        <Trash2 size={12} />
+        Удалить таблицу
+      </button>
+    </div>
+  )
+}
+
 export default function Toolbar({ editor }: ToolbarProps) {
   if (!editor) {
     return null
@@ -332,6 +388,7 @@ export default function Toolbar({ editor }: ToolbarProps) {
   const currentHighlight = editor.getAttributes('highlight').color || ''
 
   return (
+    <>
     <div className="sticky top-0 z-40 bg-white border-b border-slate-200 p-2 flex flex-wrap gap-1 items-center">
       {/* Text Formatting */}
       <div className="flex gap-0.5 border-r border-slate-200 pr-1">
@@ -499,5 +556,7 @@ export default function Toolbar({ editor }: ToolbarProps) {
         className="hidden"
       />
     </div>
+    <TableContextToolbar editor={editor} />
+    </>
   )
 }
