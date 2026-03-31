@@ -219,12 +219,98 @@ function FontSizeDropdown({
   )
 }
 
+function TableSizePicker({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false)
+  const [hoverRows, setHoverRows] = useState(0)
+  const [hoverCols, setHoverCols] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+  const maxRows = 10
+  const maxCols = 10
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleInsert = (rows: number, cols: number) => {
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        title="Вставить таблицу"
+        className="p-2 rounded-md transition-all duration-200 hover:bg-slate-100"
+      >
+        <Table2 size={18} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-50">
+          <p className="text-xs text-slate-500 mb-2 text-center">
+            {hoverRows > 0 ? `${hoverRows} × ${hoverCols}` : 'Выберите размер'}
+          </p>
+          <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${maxCols}, 1fr)` }}>
+            {Array.from({ length: maxRows * maxCols }, (_, i) => {
+              const row = Math.floor(i / maxCols) + 1
+              const col = (i % maxCols) + 1
+              const isHighlighted = row <= hoverRows && col <= hoverCols
+              return (
+                <button
+                  key={i}
+                  onMouseEnter={() => {
+                    setHoverRows(row)
+                    setHoverCols(col)
+                  }}
+                  onClick={() => handleInsert(row, col)}
+                  className={clsx(
+                    'w-5 h-5 border rounded-sm transition-colors',
+                    isHighlighted ? 'bg-purple-200 border-purple-400' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  )}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Toolbar({ editor }: ToolbarProps) {
   if (!editor) {
     return null
   }
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const handleInsertImage = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const src = event.target?.result as string
+      if (src) {
+        editor.chain().focus().setImage({ src }).run()
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const handleInsertImageUrl = () => {
     const url = prompt('Введите URL изображения:')
     if (url) {
       editor.chain().focus().setImage({ src: url }).run()
@@ -240,14 +326,6 @@ export default function Toolbar({ editor }: ToolbarProps) {
       return
     }
     editor.chain().focus().setLink({ href: url }).run()
-  }
-
-  const handleInsertTable = () => {
-    editor
-      .chain()
-      .focus()
-      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-      .run()
   }
 
   const currentTextColor = editor.getAttributes('textStyle').color || ''
@@ -377,20 +455,23 @@ export default function Toolbar({ editor }: ToolbarProps) {
       <div className="flex gap-0.5 border-r border-slate-200 pr-1">
         <ToolbarButton
           icon={<Image size={18} />}
-          label="Вставить изображение"
+          label="Загрузить изображение"
           onClick={handleInsertImage}
         />
+        <button
+          onClick={handleInsertImageUrl}
+          title="Вставить изображение по URL"
+          className="p-2 rounded-md transition-all duration-200 hover:bg-slate-100 text-slate-600 text-xs flex items-center gap-1"
+        >
+          <Link2 size={14} />
+        </button>
         <ToolbarButton
           icon={<Link2 size={18} />}
           label="Вставить ссылку"
           isActive={editor.isActive('link')}
           onClick={handleInsertLink}
         />
-        <ToolbarButton
-          icon={<Table2 size={18} />}
-          label="Вставить таблицу (3x3)"
-          onClick={handleInsertTable}
-        />
+        <TableSizePicker editor={editor} />
       </div>
 
       {/* Undo/Redo */}
@@ -408,6 +489,15 @@ export default function Toolbar({ editor }: ToolbarProps) {
           onClick={() => editor.chain().focus().redo().run()}
         />
       </div>
+
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageFileChange}
+        className="hidden"
+      />
     </div>
   )
 }

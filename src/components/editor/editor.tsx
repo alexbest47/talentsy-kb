@@ -1,6 +1,6 @@
 'use client'
 
-import { useEditor, EditorContent, type Editor as TiptapEditor } from '@tiptap/react'
+import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Table from '@tiptap/extension-table'
@@ -27,16 +27,30 @@ interface EditorProps {
 export default function Editor({ content, onUpdate, editable = true }: EditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false, // Using standalone CodeBlock extension instead
+      }),
       Image.configure({
         allowBase64: true,
+        inline: true,
       }),
       Table.configure({
         resizable: true,
+        HTMLAttributes: {
+          class: 'border-collapse table-auto w-full',
+        },
       }),
       TableRow,
-      TableCell,
-      TableHeader,
+      TableCell.configure({
+        HTMLAttributes: {
+          class: 'border border-slate-300 px-3 py-2 text-sm',
+        },
+      }),
+      TableHeader.configure({
+        HTMLAttributes: {
+          class: 'border border-slate-300 px-3 py-2 text-sm font-bold bg-slate-100',
+        },
+      }),
       Link.configure({
         openOnClick: false,
       }),
@@ -61,6 +75,55 @@ export default function Editor({ content, onUpdate, editable = true }: EditorPro
         onUpdate(editor.getJSON())
       }
     },
+    editorProps: {
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+          const file = event.dataTransfer.files[0]
+          if (file.type.startsWith('image/')) {
+            event.preventDefault()
+            const reader = new FileReader()
+            reader.onload = (e) => {
+              const src = e.target?.result as string
+              if (src) {
+                const { schema } = view.state
+                const node = schema.nodes.image.create({ src })
+                const transaction = view.state.tr.replaceSelectionWith(node)
+                view.dispatch(transaction)
+              }
+            }
+            reader.readAsDataURL(file)
+            return true
+          }
+        }
+        return false
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+              event.preventDefault()
+              const file = items[i].getAsFile()
+              if (file) {
+                const reader = new FileReader()
+                reader.onload = (e) => {
+                  const src = e.target?.result as string
+                  if (src) {
+                    const { schema } = view.state
+                    const node = schema.nodes.image.create({ src })
+                    const transaction = view.state.tr.replaceSelectionWith(node)
+                    view.dispatch(transaction)
+                  }
+                }
+                reader.readAsDataURL(file)
+              }
+              return true
+            }
+          }
+        }
+        return false
+      },
+    },
   })
 
   return (
@@ -71,6 +134,9 @@ export default function Editor({ content, onUpdate, editable = true }: EditorPro
           editor={editor}
           className={clsx(
             'prose prose-sm max-w-none px-6 py-4 focus-visible:outline-none',
+            '[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6',
+            '[&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-3 [&_td]:py-2 [&_th]:border [&_th]:border-slate-300 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-slate-100 [&_th]:font-bold',
+            '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg',
             !editable && 'py-4'
           )}
         />
