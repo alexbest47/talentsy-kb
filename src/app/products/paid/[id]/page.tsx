@@ -93,6 +93,14 @@ const productDetails: Record<string, ProductDetail> = {
   'cbt-therapist': { id: 'cbt-therapist', name: 'Профессия "КПТ-терапевт"', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/kpt-terapevt' },
   'psychologist-consultant': { id: 'psychologist-consultant', name: 'Профессия "Психолог-консультант"', tags: ['для_профессии', 'для_себя'], category: 'Психология', siteUrl: 'https://talentsy.ru/psiholog-konsultant' },
   'child-psychologist': { id: 'child-psychologist', name: 'Профессия "Детский Психолог-Консультант"', tags: ['для_профессии'], category: 'Психология', siteUrl: 'https://talentsy.ru/detskij-psiholog' },
+  'coaching': { id: 'coaching', name: 'Коучинг', tags: ['для_профессии', 'для_себя'], category: 'Психология', siteUrl: 'https://talentsy.ru/kouching' },
+  'crisis-counseling': { id: 'crisis-counseling', name: 'Кризисное консультирование', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/krizisnoe-konsultirovanie' },
+  'orkt': { id: 'orkt', name: 'ОРКТ', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/orkt' },
+  'personal-therapy': { id: 'personal-therapy', name: 'Обучающая личная терапия', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/obuchayushchaya-lichnaya-terapiya' },
+  'pdzhk': { id: 'pdzhk', name: 'ПДЖК', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/pdzhk' },
+  'fashion-designer': { id: 'fashion-designer', name: 'Профессия "Дизайнер одежды"', tags: ['для_профессии'], category: 'Дизайн', siteUrl: 'https://talentsy.ru/dizajner-odezhdy' },
+  'nutritionist': { id: 'nutritionist', name: 'Профессия "Интегративный нутрициолог"', tags: ['для_профессии'], category: 'Здоровье', siteUrl: 'https://talentsy.ru/nutriciolog' },
+  'supervision': { id: 'supervision', name: 'Супервизия', tags: ['повышение_квалификации'], category: 'Психология', siteUrl: 'https://talentsy.ru/superviziya' },
 }
 
 // ========== HELPERS ==========
