@@ -34,6 +34,13 @@ import { createClient } from '@/lib/supabase/client'
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
+const SUBCATEGORIES: Record<string, { title: string }> = {
+  'webinars': { title: 'Вебинары' },
+  'mini-courses': { title: 'Мини-курсы' },
+  'diagnostics': { title: 'Диагностики' },
+  'pdf': { title: 'PDF-материалы' },
+}
+
 type ProductTag = 'для_профессии' | 'для_себя' | 'повышение_квалификации'
 type DocAccess = 'internal' | 'external'
 
@@ -522,7 +529,9 @@ function DocumentSection({
 
 export default function ProductDetailPage() {
   const params = useParams()
+  const subcategorySlug = params.subcategory as string
   const productId = params.id as string
+  const subcategoryInfo = SUBCATEGORIES[subcategorySlug]
   const product = productDetails[productId]
 
   const [docs, setDocs] = useState<DocItem[]>([])
@@ -682,19 +691,32 @@ export default function ProductDetailPage() {
     }
   }
 
+  if (!subcategoryInfo) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-20">
+        <p className="text-slate-400 text-lg mb-4">Категория не найдена</p>
+        <Link href="/products/free/webinars" className="text-purple-600 hover:text-purple-700 font-medium text-sm inline-flex items-center gap-1">
+          <ArrowLeft size={16} /> Назад к вебинарам
+        </Link>
+      </div>
+    )
+  }
+
   if (!product) {
     return (
       <div className="max-w-4xl mx-auto text-center py-20">
         <p className="text-slate-400 text-lg mb-4">Продукт не найден</p>
-        <Link href="/products/free" className="text-purple-600 hover:text-purple-700 font-medium text-sm">← Назад к бесплатным продуктам</Link>
+        <Link href={`/products/free/${subcategorySlug}`} className="text-purple-600 hover:text-purple-700 font-medium text-sm inline-flex items-center gap-1">
+          <ArrowLeft size={16} /> Назад к {subcategoryInfo.title.toLowerCase()}
+        </Link>
       </div>
     )
   }
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Link href="/products/free" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-6">
-        <ArrowLeft size={16} /> Назад к бесплатным продуктам
+      <Link href={`/products/free/${subcategorySlug}`} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-6">
+        <ArrowLeft size={16} /> Назад к {subcategoryInfo.title.toLowerCase()}
       </Link>
 
       {/* Header */}

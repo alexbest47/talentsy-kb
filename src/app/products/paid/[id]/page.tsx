@@ -28,6 +28,7 @@ import {
   Link as LinkIcon,
   Save,
   Pencil,
+  FolderOpen,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
@@ -827,6 +828,21 @@ export default function ProductDetailPage() {
             category="Кейс"
             docs={docs}
             onAdd={() => handleAdd('Кейс')}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggleAccess={handleToggleAccess}
+            onView={(d) => setViewingDoc(d)}
+          />
+
+          {/* Прочие документы */}
+          <DocumentSection
+            title="Прочие документы"
+            icon={<FolderOpen size={18} />}
+            iconBg="bg-slate-100"
+            iconColor="text-slate-600"
+            category="Прочее"
+            docs={docs}
+            onAdd={() => handleAdd('Прочее')}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onToggleAccess={handleToggleAccess}

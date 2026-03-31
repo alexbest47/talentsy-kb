@@ -98,7 +98,10 @@ export default function Sidebar() {
       icon: <Package size={20} />,
       items: [
         { label: 'Платные', href: '/products/paid' },
-        { label: 'Бесплатные', href: '/products/free' },
+        { label: 'Вебинары', href: '/products/free/webinars' },
+        { label: 'Мини-курсы', href: '/products/free/mini-courses' },
+        { label: 'Диагностики', href: '/products/free/diagnostics' },
+        { label: 'PDF', href: '/products/free/pdf' },
       ],
     },
     {
