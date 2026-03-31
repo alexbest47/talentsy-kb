@@ -8,6 +8,8 @@ import {
   Shield,
   Database,
   ArrowRight,
+  Tag,
+  Target,
 } from 'lucide-react'
 
 interface AdminCard {
@@ -20,6 +22,22 @@ interface AdminCard {
 }
 
 const adminCards: AdminCard[] = [
+  {
+    id: 'tags',
+    title: 'Управление тегами',
+    description: 'Создание и удаление тегов для программ и документов',
+    icon: <Tag size={32} />,
+    href: '/admin/tags',
+    stats: 'Теги для категоризации контента',
+  },
+  {
+    id: 'goals',
+    title: 'Управление целями',
+    description: 'Установка квартальных целей для отделов и ролей',
+    icon: <Target size={32} />,
+    href: '/admin/goals',
+    stats: 'Квартальные OKR и KPI',
+  },
   {
     id: 'users',
     title: 'Управление пользователями',

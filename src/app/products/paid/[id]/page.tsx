@@ -26,6 +26,8 @@ import {
   Lock,
   Unlock,
   Link as LinkIcon,
+  Save,
+  Pencil,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
@@ -563,6 +565,41 @@ export default function ProductDetailPage() {
   const [editorCategory, setEditorCategory] = useState('Описание продукта')
   const [editingDoc, setEditingDoc] = useState<DocItem | null>(null)
   const [viewingDoc, setViewingDoc] = useState<DocItem | null>(null)
+  const [editingProduct, setEditingProduct] = useState(false)
+  const [editName, setEditName] = useState(product?.name || '')
+  const [editCategory, setEditCategory] = useState(product?.category || '')
+  const [editSiteUrl, setEditSiteUrl] = useState(product?.siteUrl || '')
+  const [editDescription, setEditDescription] = useState('')
+  const [savingProduct, setSavingProduct] = useState(false)
+
+  // Fetch product description from Supabase
+  useEffect(() => {
+    const fetchProductInfo = async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('products').select('description').eq('slug', productId).single()
+      if (data?.description) setEditDescription(data.description)
+    }
+    if (productId) fetchProductInfo()
+  }, [productId])
+
+  const handleSaveProduct = async () => {
+    setSavingProduct(true)
+    try {
+      const supabase = createClient()
+      await supabase.from('products').update({
+        name: editName,
+        category: editCategory,
+        site_url: editSiteUrl,
+        description: editDescription,
+        updated_at: new Date().toISOString(),
+      }).eq('slug', productId)
+      setEditingProduct(false)
+    } catch (err) {
+      console.error('Error saving product:', err)
+    } finally {
+      setSavingProduct(false)
+    }
+  }
 
   // Fetch documents from Supabase
   useEffect(() => {
@@ -696,14 +733,62 @@ export default function ProductDetailPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <div className="flex flex-wrap gap-2 mb-3">
-          {product.tags.map((tag) => (<TagBadge key={tag} tag={tag} />))}
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">{product.category}</span>
-        </div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-4">{product.name}</h1>
-        <a href={product.siteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">
-          <Globe size={16} /> Страница программы на сайте <ExternalLink size={14} />
-        </a>
+        {editingProduct ? (
+          <div className="bg-white border border-slate-200 rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-bold text-slate-900">Редактировать программу</h2>
+              <button onClick={() => setEditingProduct(false)} className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Название программы</label>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Категория</label>
+                <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Ссылка на сайт</label>
+                <input type="text" value={editSiteUrl} onChange={(e) => setEditSiteUrl(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Описание программы</label>
+              <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={4} placeholder="Краткое описание программы..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 resize-none" />
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button onClick={handleSaveProduct} disabled={savingProduct || !editName.trim()} className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium transition-colors">
+                <Save size={16} />
+                {savingProduct ? 'Сохранение...' : 'Сохранить'}
+              </button>
+              <button onClick={() => setEditingProduct(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">
+                Отмена
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {product.tags.map((tag) => (<TagBadge key={tag} tag={tag} />))}
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">{product.category}</span>
+            </div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold text-slate-900">{editName || product.name}</h1>
+              <button onClick={() => setEditingProduct(true)} title="Редактировать программу" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-purple-600 transition-colors">
+                <Pencil size={18} />
+              </button>
+            </div>
+            {editDescription && (
+              <p className="text-slate-600 text-sm mb-4">{editDescription}</p>
+            )}
+            <a href={editSiteUrl || product.siteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">
+              <Globe size={16} /> Страница программы на сайте <ExternalLink size={14} />
+            </a>
+          </>
+        )}
       </div>
 
       {loading ? (
