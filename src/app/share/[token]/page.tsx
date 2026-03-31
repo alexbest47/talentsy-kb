@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { Lock } from 'lucide-react'
 import Editor from '@/components/editor/editor'
-import Image from 'next/image'
 
 interface SharedDocument {
   title: string
@@ -13,7 +13,6 @@ interface SharedDocument {
   content: any
 }
 
-// Mock data - replace with actual document fetching by token
 const mockDocument: SharedDocument = {
   title: 'Процесс адаптации новых сотрудников',
   section: 'Общее',
@@ -89,22 +88,19 @@ const mockDocument: SharedDocument = {
   },
 }
 
-export default function SharePage({
-  params,
-}: {
-  params: { token: string }
-}) {
+export default function SharePage() {
+  const params = useParams()
+  const token = params.token as string
+
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [document, setDocument] = useState<SharedDocument | null>(null)
 
   useEffect(() => {
-    // Simulate fetching document by token
     const fetchDocument = async () => {
       try {
-        // TODO: Call Supabase to fetch document by share token
-        console.log('Fetching shared document with token:', params.token)
-        await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate network delay
+        console.log('Fetching shared document with token:', token)
+        await new Promise((resolve) => setTimeout(resolve, 500))
         setDocument(mockDocument)
         setIsLoading(false)
       } catch (err) {
@@ -115,14 +111,14 @@ export default function SharePage({
     }
 
     fetchDocument()
-  }, [params.token])
+  }, [token])
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block p-4 bg-slate-700 rounded-full mb-4">
-            <div className="w-8 h-8 border-4 border-purple-400 border-t-purple-600 rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-4 border-purple-400 border-t-purple-600 rounded-full animate-spin" />
           </div>
           <p className="text-slate-300">Загрузка документа...</p>
         </div>
@@ -148,7 +144,6 @@ export default function SharePage({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      {/* Top Bar */}
       <div className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur border-b border-slate-700/50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -163,9 +158,7 @@ export default function SharePage({
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
         <div className="mb-12">
           <h2 className="text-4xl font-bold text-white mb-4">{document.title}</h2>
           <div className="flex items-center gap-6 text-sm text-slate-400">
@@ -184,15 +177,13 @@ export default function SharePage({
           </div>
         </div>
 
-        {/* Document Content */}
         <div className="bg-white rounded-lg shadow-2xl overflow-hidden" style={{ minHeight: '600px' }}>
           <Editor content={document.content} editable={false} />
         </div>
 
-        {/* Footer */}
         <div className="mt-12 text-center text-sm text-slate-400">
           <p className="mb-4">
-            Этот документ поделен из&nbsp;
+            Этот документ предоставлен из&nbsp;
             <span className="text-purple-400 font-semibold">Talentsy KB</span>
           </p>
           <p className="text-xs text-slate-500">

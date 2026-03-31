@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { Lock, FileText, Video, ExternalLink } from 'lucide-react'
 import Editor from '@/components/editor/editor'
 
@@ -42,11 +43,10 @@ const mockCase: SharedCase = {
   date: '31.03.2026',
 }
 
-export default function ShareCasePage({
-  params,
-}: {
-  params: { token: string }
-}) {
+export default function ShareCasePage() {
+  const params = useParams()
+  const token = params.token as string
+
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [caseData, setCaseData] = useState<SharedCase | null>(null)
@@ -54,8 +54,7 @@ export default function ShareCasePage({
   useEffect(() => {
     const fetchCase = async () => {
       try {
-        // TODO: Call Supabase to fetch case document by share token
-        console.log('Fetching shared case with token:', params.token)
+        console.log('Fetching shared case with token:', token)
         await new Promise((resolve) => setTimeout(resolve, 500))
         setCaseData(mockCase)
         setIsLoading(false)
@@ -67,7 +66,7 @@ export default function ShareCasePage({
     }
 
     fetchCase()
-  }, [params.token])
+  }, [token])
 
   if (isLoading) {
     return (
