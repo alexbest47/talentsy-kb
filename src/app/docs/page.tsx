@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Search,
@@ -12,102 +12,23 @@ import {
   User,
   Lock,
   Unlock,
-  Copy,
-  Check,
-  Link as LinkIcon,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { createClient } from '@/lib/supabase/client'
 
 type DocAccess = 'internal' | 'external'
 
 interface Document {
   id: string
   title: string
-  excerpt: string
+  content: any
   category: string
   author: string
-  updatedAt: string
-  views: number
+  created_at: string
+  updated_at: string
   access: DocAccess
-  shareToken?: string
+  share_token?: string
 }
-
-const documents: Document[] = [
-  {
-    id: 'doc1',
-    title: 'Руководство по использованию платформы',
-    excerpt: 'Полное руководство для новых пользователей по базовым функциям платформы',
-    category: 'Инструкция',
-    author: 'Наталья Федорова',
-    updatedAt: '2026-03-20',
-    views: 1234,
-    access: 'external',
-    shareToken: 'tk_doc1_abc123def456',
-  },
-  {
-    id: 'doc2',
-    title: 'Регламент работы отдела продаж',
-    excerpt: 'Описание процессов, KPI и стандартов работы отдела продаж',
-    category: 'Регламент',
-    author: 'Дмитрий Орлов',
-    updatedAt: '2026-03-18',
-    views: 856,
-    access: 'internal',
-  },
-  {
-    id: 'doc3',
-    title: 'Процесс адаптации новых сотрудников',
-    excerpt: 'Пошаговый чеклист онбординга с описанием каждого этапа',
-    category: 'Инструкция',
-    author: 'Сергей Морозов',
-    updatedAt: '2026-03-15',
-    views: 567,
-    access: 'external',
-    shareToken: 'tk_doc3_xyz789ghi012',
-  },
-  {
-    id: 'doc4',
-    title: 'Политика информационной безопасности',
-    excerpt: 'Правила обращения с конфиденциальными данными и доступом к системам',
-    category: 'Регламент',
-    author: 'Анна Волконская',
-    updatedAt: '2026-03-12',
-    views: 432,
-    access: 'internal',
-  },
-  {
-    id: 'doc5',
-    title: 'Описание программы «Психолог-консультант»',
-    excerpt: 'Подробное описание флагманской программы для страницы продукта',
-    category: 'Описание продукта',
-    author: 'Юрий Кравцов',
-    updatedAt: '2026-03-10',
-    views: 789,
-    access: 'external',
-    shareToken: 'tk_doc5_prod_psych01',
-  },
-  {
-    id: 'doc6',
-    title: 'Кейс выпускницы: Анна М.',
-    excerpt: 'История успеха выпускницы программы семейной психологии',
-    category: 'Кейс',
-    author: 'Павел Иванов',
-    updatedAt: '2026-03-08',
-    views: 654,
-    access: 'external',
-    shareToken: 'tk_doc6_case_anna01',
-  },
-  {
-    id: 'doc7',
-    title: 'Целевая аудитория: Арт-терапия',
-    excerpt: 'Описание ЦА для направления арт-терапии',
-    category: 'Описание аудитории',
-    author: 'Мария Смирнова',
-    updatedAt: '2026-03-05',
-    views: 321,
-    access: 'internal',
-  },
-]
 
 const categories = [
   'Все',
@@ -119,15 +40,38 @@ const categories = [
 ]
 
 export default function DocsPage() {
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('Все')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [accessFilter, setAccessFilter] = useState<'all' | 'internal' | 'external'>('all')
 
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
+
+  const fetchDocuments = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setDocuments(data || [])
+    } catch (error) {
+      console.error('Error fetching documents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredDocs = documents.filter((doc) => {
     const matchesSearch =
       doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.excerpt.toLowerCase().includes(searchQuery.toLowerCase())
+      doc.category.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = selectedCategory === 'Все' || doc.category === selectedCategory
     const matchesAccess =
       accessFilter === 'all' ||
@@ -137,6 +81,16 @@ export default function DocsPage() {
 
   const internalCount = documents.filter((d) => d.access === 'internal').length
   const externalCount = documents.filter((d) => d.access === 'external').length
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-slate-600">Загрузка документов...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -290,7 +244,9 @@ export default function DocsPage() {
                   </span>
                 </div>
                 <h3 className="text-base font-bold text-slate-900 mb-2 line-clamp-2">{doc.title}</h3>
-                <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-1">{doc.excerpt}</p>
+                <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-1">
+                  {doc.category}
+                </p>
                 <div className="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-100">
                   <div className="flex items-center gap-1">
                     <User size={12} />
@@ -298,7 +254,7 @@ export default function DocsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock size={12} />
-                    {new Date(doc.updatedAt).toLocaleDateString('ru-RU')}
+                    {new Date(doc.updated_at).toLocaleDateString('ru-RU')}
                   </div>
                 </div>
               </div>
@@ -330,11 +286,10 @@ export default function DocsPage() {
                         {doc.access === 'external' ? 'Внешний' : 'Внутренний'}
                       </span>
                     </div>
-                    <p className="text-slate-500 text-xs mb-2 line-clamp-1">{doc.excerpt}</p>
+                    <p className="text-slate-500 text-xs mb-2 line-clamp-1">{doc.category}</p>
                     <div className="flex items-center gap-4 text-xs text-slate-400">
                       <span className="flex items-center gap-1"><User size={11} />{doc.author}</span>
-                      <span className="flex items-center gap-1"><Clock size={11} />{new Date(doc.updatedAt).toLocaleDateString('ru-RU')}</span>
-                      <span>{doc.views} просмотров</span>
+                      <span className="flex items-center gap-1"><Clock size={11} />{new Date(doc.updated_at).toLocaleDateString('ru-RU')}</span>
                     </div>
                   </div>
                 </div>

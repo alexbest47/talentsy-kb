@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   ArrowLeft,
   ExternalLink,
@@ -13,7 +14,6 @@ import {
   Globe,
   Target,
   BookOpen,
-  Video,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -29,7 +29,9 @@ import {
   Save,
 } from 'lucide-react'
 import clsx from 'clsx'
-import Editor from '@/components/editor/editor'
+import { createClient } from '@/lib/supabase/client'
+
+const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
 type ProductTag = 'для_профессии' | 'для_себя' | 'повышение_квалификации'
 type DocAccess = 'internal' | 'external'
@@ -37,15 +39,14 @@ type DocAccess = 'internal' | 'external'
 interface DocItem {
   id: string
   title: string
-  type: 'video' | 'document'
-  access: DocAccess
-  videoUrl?: string
-  content?: any
-  shareToken?: string
-  description: string
-  date: string
+  content: any
+  category: string
+  access: 'internal' | 'external'
+  share_token: string | null
+  product_id: string | null
   author: string
-  category: string // e.g. 'Описание продукта', 'Описание аудитории', 'Кейс'
+  created_at: string
+  updated_at: string
 }
 
 interface ProductDetail {
@@ -98,7 +99,7 @@ const productDetails: Record<string, ProductDetail> = {
 // ========== HELPERS ==========
 
 function generateId() {
-  return 'doc_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now()
+  return crypto.randomUUID?.() || 'doc_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now()
 }
 
 function generateShareToken() {
@@ -131,8 +132,8 @@ function DocCard({
   onView: () => void
 }) {
   const [copied, setCopied] = useState(false)
-  const shareUrl = doc.access === 'external' && doc.shareToken
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${doc.shareToken}`
+  const shareUrl = doc.access === 'external' && doc.share_token
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${doc.share_token}`
     : null
 
   const handleCopy = () => {
@@ -143,14 +144,20 @@ function DocCard({
     }
   }
 
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr)
+      return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`
+    } catch {
+      return dateStr
+    }
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start gap-3">
-        <div className={clsx(
-          'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-          doc.type === 'video' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
-        )}>
-          {doc.type === 'video' ? <Video size={20} /> : <FileText size={20} />}
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-100 text-blue-600">
+          <FileText size={20} />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -163,18 +170,12 @@ function DocCard({
               {doc.access === 'external' ? <><Unlock size={9} /> Внешний</> : <><Lock size={9} /> Внутренний</>}
             </span>
           </div>
-          {doc.description && (
-            <p className="text-xs text-slate-500 line-clamp-1">{doc.description}</p>
-          )}
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-xs text-slate-400">{doc.date}</span>
+            <span className="text-xs text-slate-400">{formatDate(doc.created_at)}</span>
             <span className="text-xs text-slate-400">•</span>
             <span className="text-xs text-slate-400">{doc.author}</span>
-            <span className={clsx(
-              'text-xs font-medium px-2 py-0.5 rounded',
-              doc.type === 'video' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
-            )}>
-              {doc.type === 'video' ? 'Видео' : 'Документ'}
+            <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-50 text-blue-600">
+              Документ
             </span>
           </div>
 
@@ -207,39 +208,35 @@ function DocCard({
 function DocEditorModal({
   initialDoc,
   defaultCategory,
+  productId,
   onSave,
   onClose,
 }: {
   initialDoc?: DocItem | null
   defaultCategory: string
+  productId: string
   onSave: (data: DocItem) => void
   onClose: () => void
 }) {
   const isNew = !initialDoc
   const [title, setTitle] = useState(initialDoc?.title || '')
-  const [description, setDescription] = useState(initialDoc?.description || '')
-  const [type, setType] = useState<'video' | 'document'>(initialDoc?.type || 'document')
   const [access, setAccess] = useState<DocAccess>(initialDoc?.access || 'internal')
-  const [videoUrl, setVideoUrl] = useState(initialDoc?.videoUrl || '')
   const [content, setContent] = useState<any>(initialDoc?.content || null)
 
   const handleSave = () => {
     if (!title.trim()) return
-    const now = new Date()
-    const dateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
 
     const docData: DocItem = {
       id: initialDoc?.id || generateId(),
       title: title.trim(),
-      description: description.trim(),
-      type,
-      access,
-      videoUrl: type === 'video' ? videoUrl : undefined,
-      content: type === 'document' ? content : undefined,
-      shareToken: access === 'external' ? (initialDoc?.shareToken || generateShareToken()) : undefined,
-      date: initialDoc?.date || dateStr,
-      author: initialDoc?.author || 'Администратор',
+      content,
       category: defaultCategory,
+      access,
+      share_token: access === 'external' ? (initialDoc?.share_token || generateShareToken()) : null,
+      author: initialDoc?.author || 'Администратор',
+      product_id: productId,
+      created_at: initialDoc?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
     onSave(docData)
   }
@@ -260,24 +257,7 @@ function DocEditorModal({
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Название документа..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Краткое описание</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Краткое описание для списка документов..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Формат</label>
-              <div className="flex gap-2">
-                <button onClick={() => setType('document')} className={clsx('flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors', type === 'document' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300')}>
-                  <FileText size={16} /> Документ
-                </button>
-                <button onClick={() => setType('video')} className={clsx('flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors', type === 'video' ? 'bg-red-50 border-red-300 text-red-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300')}>
-                  <Video size={16} /> Видео
-                </button>
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Доступ</label>
               <div className="flex gap-2">
@@ -299,21 +279,12 @@ function DocEditorModal({
             )}
           </div>
 
-          {type === 'video' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ссылка на видео</label>
-              <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Содержание</label>
+            <div className="border border-slate-200 rounded-lg overflow-hidden" style={{ minHeight: 350 }}>
+              <Editor content={content} onUpdate={(json) => setContent(json)} editable={true} />
             </div>
-          )}
-
-          {type === 'document' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Содержание</label>
-              <div className="border border-slate-200 rounded-lg overflow-hidden" style={{ minHeight: 350 }}>
-                <Editor content={content} onUpdate={(json) => setContent(json)} editable={true} />
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
@@ -331,33 +302,37 @@ function DocEditorModal({
 // ========== DOC VIEWER MODAL ==========
 
 function DocViewerModal({ doc, onClose }: { doc: DocItem; onClose: () => void }) {
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr)
+      return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`
+    } catch {
+      return dateStr
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className={clsx('w-8 h-8 rounded-lg flex items-center justify-center', doc.type === 'video' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600')}>
-              {doc.type === 'video' ? <Video size={16} /> : <FileText size={16} />}
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-100 text-blue-600">
+              <FileText size={16} />
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">{doc.title}</h2>
-              <p className="text-xs text-slate-500">{doc.date} • {doc.author}</p>
+              <p className="text-xs text-slate-500">{formatDate(doc.created_at)} • {doc.author}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
         </div>
         <div className="px-6 py-4">
-          {doc.type === 'video' && doc.videoUrl && (
-            <a href={doc.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
-              <Video size={16} /> Смотреть видео <ExternalLink size={14} />
-            </a>
-          )}
-          {doc.type === 'document' && doc.content && (
+          {doc.content && (
             <div className="border border-slate-200 rounded-lg overflow-hidden" style={{ minHeight: 300 }}>
               <Editor content={doc.content} editable={false} />
             </div>
           )}
-          {doc.type === 'document' && !doc.content && (
+          {!doc.content && (
             <div className="text-center py-12 text-slate-400"><FileText size={32} className="mx-auto mb-2" /><p>Содержание пусто</p></div>
           )}
         </div>
@@ -454,10 +429,40 @@ export default function ProductDetailPage() {
   const product = productDetails[productId]
 
   const [docs, setDocs] = useState<DocItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorCategory, setEditorCategory] = useState('Описание продукта')
   const [editingDoc, setEditingDoc] = useState<DocItem | null>(null)
   const [viewingDoc, setViewingDoc] = useState<DocItem | null>(null)
+
+  // Fetch documents from Supabase
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('product_id', productId)
+
+        if (error) {
+          console.error('Error fetching documents:', error)
+          setDocs([])
+        } else {
+          setDocs(data || [])
+        }
+      } catch (err) {
+        console.error('Error fetching documents:', err)
+        setDocs([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (productId) {
+      fetchDocs()
+    }
+  }, [productId])
 
   const handleAdd = (category: string) => {
     setEditorCategory(category)
@@ -471,30 +476,98 @@ export default function ProductDetailPage() {
     setEditorOpen(true)
   }
 
-  const handleSave = (data: DocItem) => {
-    setDocs((prev) => {
-      const exists = prev.find((d) => d.id === data.id)
-      if (exists) return prev.map((d) => (d.id === data.id ? data : d))
-      return [...prev, data]
-    })
-    setEditorOpen(false)
-    setEditingDoc(null)
-  }
+  const handleSave = async (data: DocItem) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('documents')
+        .upsert({
+          id: data.id,
+          title: data.title,
+          content: data.content,
+          category: data.category,
+          access: data.access,
+          share_token: data.share_token,
+          product_id: data.product_id,
+          author: data.author,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        })
 
-  const handleDelete = (id: string) => {
-    if (confirm('Удалить этот документ?')) {
-      setDocs((prev) => prev.filter((d) => d.id !== id))
+      if (error) {
+        console.error('Error saving document:', error)
+        return
+      }
+
+      // Update local state
+      setDocs((prev) => {
+        const exists = prev.find((d) => d.id === data.id)
+        if (exists) return prev.map((d) => (d.id === data.id ? data : d))
+        return [...prev, data]
+      })
+      setEditorOpen(false)
+      setEditingDoc(null)
+    } catch (err) {
+      console.error('Error saving document:', err)
     }
   }
 
-  const handleToggleAccess = (d: DocItem) => {
-    setDocs((prev) =>
-      prev.map((item) => {
-        if (item.id !== d.id) return item
-        const newAccess: DocAccess = item.access === 'external' ? 'internal' : 'external'
-        return { ...item, access: newAccess, shareToken: newAccess === 'external' ? (item.shareToken || generateShareToken()) : undefined }
-      })
-    )
+  const handleDelete = async (id: string) => {
+    if (confirm('Удалить этот документ?')) {
+      try {
+        const supabase = createClient()
+        const { error } = await supabase
+          .from('documents')
+          .delete()
+          .eq('id', id)
+
+        if (error) {
+          console.error('Error deleting document:', error)
+          return
+        }
+
+        // Update local state
+        setDocs((prev) => prev.filter((d) => d.id !== id))
+      } catch (err) {
+        console.error('Error deleting document:', err)
+      }
+    }
+  }
+
+  const handleToggleAccess = async (d: DocItem) => {
+    const newAccess: DocAccess = d.access === 'external' ? 'internal' : 'external'
+    const newShareToken = newAccess === 'external' ? (d.share_token || generateShareToken()) : null
+
+    const updatedDoc: DocItem = {
+      ...d,
+      access: newAccess,
+      share_token: newShareToken,
+      updated_at: new Date().toISOString(),
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          access: newAccess,
+          share_token: newShareToken,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', d.id)
+
+      if (error) {
+        console.error('Error updating document access:', error)
+        return
+      }
+
+      // Update local state
+      setDocs((prev) =>
+        prev.map((item) => (item.id === d.id ? updatedDoc : item))
+      )
+    } catch (err) {
+      console.error('Error updating document access:', err)
+    }
   }
 
   if (!product) {
@@ -524,65 +597,72 @@ export default function ProductDetailPage() {
         </a>
       </div>
 
-      {/* Описание продукта */}
-      <DocumentSection
-        title="Описание продукта"
-        icon={<BookOpen size={18} />}
-        iconBg="bg-purple-100"
-        iconColor="text-purple-600"
-        category="Описание продукта"
-        docs={docs}
-        onAdd={() => handleAdd('Описание продукта')}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onToggleAccess={handleToggleAccess}
-        onView={(d) => setViewingDoc(d)}
-      />
+      {loading ? (
+        <div className="text-center py-12 text-slate-400">Загрузка документов...</div>
+      ) : (
+        <>
+          {/* Описание продукта */}
+          <DocumentSection
+            title="Описание продукта"
+            icon={<BookOpen size={18} />}
+            iconBg="bg-purple-100"
+            iconColor="text-purple-600"
+            category="Описание продукта"
+            docs={docs}
+            onAdd={() => handleAdd('Описание продукта')}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggleAccess={handleToggleAccess}
+            onView={(d) => setViewingDoc(d)}
+          />
 
-      {/* Описание аудитории */}
-      <DocumentSection
-        title="Описание аудитории"
-        icon={<Target size={18} />}
-        iconBg="bg-blue-100"
-        iconColor="text-blue-600"
-        category="Описание аудитории"
-        docs={docs}
-        onAdd={() => handleAdd('Описание аудитории')}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onToggleAccess={handleToggleAccess}
-        onView={(d) => setViewingDoc(d)}
-      />
+          {/* Описание аудитории */}
+          <DocumentSection
+            title="Описание аудитории"
+            icon={<Target size={18} />}
+            iconBg="bg-blue-100"
+            iconColor="text-blue-600"
+            category="Описание аудитории"
+            docs={docs}
+            onAdd={() => handleAdd('Описание аудитории')}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggleAccess={handleToggleAccess}
+            onView={(d) => setViewingDoc(d)}
+          />
 
-      {/* Кейсы */}
-      <DocumentSection
-        title="Кейсы по программе"
-        icon={<FileText size={18} />}
-        iconBg="bg-amber-100"
-        iconColor="text-amber-600"
-        category="Кейс"
-        docs={docs}
-        onAdd={() => handleAdd('Кейс')}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onToggleAccess={handleToggleAccess}
-        onView={(d) => setViewingDoc(d)}
-      />
+          {/* Кейсы */}
+          <DocumentSection
+            title="Кейсы по программе"
+            icon={<FileText size={18} />}
+            iconBg="bg-amber-100"
+            iconColor="text-amber-600"
+            category="Кейс"
+            docs={docs}
+            onAdd={() => handleAdd('Кейс')}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggleAccess={handleToggleAccess}
+            onView={(d) => setViewingDoc(d)}
+          />
 
-      {/* Info footer */}
-      <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-        <p className="text-xs text-slate-500">
-          Все документы сохраняются в общую базу документов системы и отображаются на странице программы.
-          Документы с внешним доступом получают уникальную ссылку для просмотра. Внутренние документы
-          доступны только сотрудникам.
-        </p>
-      </div>
+          {/* Info footer */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+            <p className="text-xs text-slate-500">
+              Все документы сохраняются в общую базу документов системы и отображаются на странице программы.
+              Документы с внешним доступом получают уникальную ссылку для просмотра. Внутренние документы
+              доступны только сотрудникам.
+            </p>
+          </div>
+        </>
+      )}
 
       {/* Modals */}
       {editorOpen && (
         <DocEditorModal
           initialDoc={editingDoc}
           defaultCategory={editorCategory}
+          productId={productId}
           onSave={handleSave}
           onClose={() => { setEditorOpen(false); setEditingDoc(null) }}
         />

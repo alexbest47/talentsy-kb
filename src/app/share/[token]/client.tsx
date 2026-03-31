@@ -3,91 +3,18 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import { createBrowserClient } from '@supabase/ssr'
 import { Lock } from 'lucide-react'
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
 interface SharedDocument {
+  id: string
   title: string
-  section: string
+  category: string
   author: string
-  date: string
+  created_at: string
   content: any
-}
-
-const mockDocument: SharedDocument = {
-  title: 'Процесс адаптации новых сотрудников',
-  section: 'Общее',
-  author: 'Иван Петров',
-  date: '2024-03-28',
-  content: {
-    type: 'doc',
-    content: [
-      {
-        type: 'heading',
-        attrs: { level: 1 },
-        content: [{ type: 'text', text: 'Процесс адаптации новых сотрудников' }],
-      },
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'Подробное описание всех этапов онбординга и интеграции новых членов команды в компанию.',
-          },
-        ],
-      },
-      {
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: 'Первый день' }],
-      },
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'В первый день новый сотрудник должен пройти следующие процедуры:',
-          },
-        ],
-      },
-      {
-        type: 'bulletList',
-        content: [
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Получить доступ в офис' }] }],
-          },
-          {
-            type: 'listItem',
-            content: [
-              { type: 'paragraph', content: [{ type: 'text', text: 'Получить рабочее место и оборудование' }] },
-            ],
-          },
-          {
-            type: 'listItem',
-            content: [
-              { type: 'paragraph', content: [{ type: 'text', text: 'Встретиться с менеджером и командой' }] },
-            ],
-          },
-        ],
-      },
-      {
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: 'Первая неделя' }],
-      },
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'На первой неделе работник проходит более детальное ознакомление с компанией и процессами.',
-          },
-        ],
-      },
-    ],
-  },
 }
 
 export default function SharePageClient() {
@@ -101,19 +28,77 @@ export default function SharePageClient() {
   useEffect(() => {
     const fetchDocument = async () => {
       try {
-        console.log('Fetching shared document with token:', token)
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        setDocument(mockDocument)
+        setIsLoading(true)
+        setError(null)
+
+        // Create Supabase browser client
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
+        // Fetch document by share token with external access
+        const { data, error: fetchError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('share_token', token)
+          .eq('access', 'external')
+          .single()
+
+        if (fetchError) {
+          console.error('Error fetching document:', fetchError)
+          setError('Документ не найден или доступ запрещен')
+          setDocument(null)
+          setIsLoading(false)
+          return
+        }
+
+        if (!data) {
+          setError('Документ не найден или доступ запрещен')
+          setDocument(null)
+          setIsLoading(false)
+          return
+        }
+
+        // Map database fields to component interface
+        const sharedDoc: SharedDocument = {
+          id: data.id,
+          title: data.title,
+          category: data.category || 'Без категории',
+          author: data.author || 'Неизвестный автор',
+          created_at: data.created_at,
+          content: data.content,
+        }
+
+        setDocument(sharedDoc)
+        setError(null)
         setIsLoading(false)
       } catch (err) {
         console.error('Error fetching document:', err)
         setError('Документ не найден или доступ запрещен')
+        setDocument(null)
         setIsLoading(false)
       }
     }
 
-    fetchDocument()
+    if (token) {
+      fetchDocument()
+    }
   }, [token])
+
+  // Format date nicely
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('ru-RU', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    } catch {
+      return dateString
+    }
+  }
 
   if (isLoading) {
     return (
@@ -166,7 +151,7 @@ export default function SharePageClient() {
           <div className="flex items-center gap-6 text-sm text-slate-400">
             <div>
               <p className="text-slate-500 mb-0.5">Раздел</p>
-              <p className="text-slate-200 font-medium">{document.section}</p>
+              <p className="text-slate-200 font-medium">{document.category}</p>
             </div>
             <div>
               <p className="text-slate-500 mb-0.5">Автор</p>
@@ -174,7 +159,7 @@ export default function SharePageClient() {
             </div>
             <div>
               <p className="text-slate-500 mb-0.5">Дата</p>
-              <p className="text-slate-200 font-medium">{document.date}</p>
+              <p className="text-slate-200 font-medium">{formatDate(document.created_at)}</p>
             </div>
           </div>
         </div>

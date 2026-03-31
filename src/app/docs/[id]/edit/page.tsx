@@ -1,13 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, Save, Lock, Unlock } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import clsx from 'clsx'
-import Editor from '@/components/editor/editor'
+import dynamic from 'next/dynamic'
+import { createClient } from '@/lib/supabase/client'
+
+const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
 type DocAccess = 'internal' | 'external'
+
+interface DocumentData {
+  id: string
+  title: string
+  category: string
+  access: DocAccess
+  content: any
+  share_token?: string
+}
 
 const categories = [
   'Инструкция',
@@ -17,52 +29,89 @@ const categories = [
   'Описание аудитории',
 ]
 
-// Mock — will be fetched from Supabase
-const mockDoc = {
-  title: 'Руководство по использованию платформы',
-  category: 'Инструкция',
-  access: 'external' as DocAccess,
-  content: {
-    type: 'doc',
-    content: [
-      {
-        type: 'heading',
-        attrs: { level: 1 },
-        content: [{ type: 'text', text: 'Руководство по использованию платформы Talentsy' }],
-      },
-      {
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: 'Введение' }],
-      },
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'Talentsy — это инновационная платформа для управления талантами и развития персонала.',
-          },
-        ],
-      },
-    ],
-  },
-}
-
 export default function EditDocPage() {
   const params = useParams()
   const router = useRouter()
   const id = params?.id as string
 
-  const [title, setTitle] = useState(mockDoc.title)
-  const [category, setCategory] = useState(mockDoc.category)
-  const [access, setAccess] = useState<DocAccess>(mockDoc.access)
-  const [content, setContent] = useState<any>(mockDoc.content)
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState('Инструкция')
+  const [access, setAccess] = useState<DocAccess>('internal')
+  const [content, setContent] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [shareToken, setShareToken] = useState<string | null>(null)
 
-  const handleSave = () => {
+  useEffect(() => {
+    fetchDocument()
+  }, [id])
+
+  const fetchDocument = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+
+      if (data) {
+        setTitle(data.title)
+        setCategory(data.category)
+        setAccess(data.access)
+        setContent(data.content)
+        setShareToken(data.share_token || null)
+      }
+    } catch (error) {
+      console.error('Error fetching document:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
     if (!title.trim()) return
-    // TODO: Update in Supabase
-    console.log('Updating document:', { id, title, category, access, content })
-    router.push(`/docs/${id}`)
+
+    setSaving(true)
+    try {
+      const supabase = createClient()
+
+      const newShareToken = access === 'external' && !shareToken
+        ? 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+        : shareToken
+
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          title,
+          content,
+          category,
+          access,
+          share_token: newShareToken,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+
+      if (error) throw error
+
+      router.push(`/docs/${id}`)
+    } catch (error) {
+      console.error('Error updating document:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-slate-600">Загрузка документа...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -168,11 +217,11 @@ export default function EditDocPage() {
         <div className="flex gap-3 pt-2">
           <button
             onClick={handleSave}
-            disabled={!title.trim()}
+            disabled={!title.trim() || saving}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             <Save size={18} />
-            Сохранить изменения
+            {saving ? 'Сохранение...' : 'Сохранить изменения'}
           </button>
           <Link href={`/docs/${id}`}>
             <button className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium text-sm transition-colors">

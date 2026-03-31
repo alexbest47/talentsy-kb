@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -8,7 +8,6 @@ import {
   Edit,
   Clock,
   User,
-  Eye,
   Lock,
   Unlock,
   Copy,
@@ -17,8 +16,11 @@ import {
   Share2,
 } from 'lucide-react'
 import clsx from 'clsx'
-import Editor from '@/components/editor/editor'
+import dynamic from 'next/dynamic'
+import { createClient } from '@/lib/supabase/client'
 import ShareDialog from '@/components/documents/share-dialog'
+
+const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
 type DocAccess = 'internal' | 'external'
 
@@ -27,101 +29,68 @@ interface DocumentData {
   title: string
   category: string
   author: string
-  updatedAt: string
-  views: number
+  updated_at: string
   access: DocAccess
-  shareToken?: string
-  content: any // Tiptap JSON
-}
-
-const mockDocument: DocumentData = {
-  id: '1',
-  title: 'Руководство по использованию платформы',
-  category: 'Инструкция',
-  author: 'Наталья Федорова',
-  updatedAt: '2026-03-20',
-  views: 1234,
-  access: 'external',
-  shareToken: 'tk_doc1_abc123def456',
-  content: {
-    type: 'doc',
-    content: [
-      {
-        type: 'heading',
-        attrs: { level: 1 },
-        content: [{ type: 'text', text: 'Руководство по использованию платформы Talentsy' }],
-      },
-      {
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: 'Введение' }],
-      },
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'Talentsy — это инновационная платформа для управления талантами и развития персонала. Это руководство поможет вам быстро начать работу с основными функциями.',
-          },
-        ],
-      },
-      {
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: 'Основные разделы' }],
-      },
-      {
-        type: 'bulletList',
-        content: [
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Управление кандидатами — отслеживайте весь процесс рекрутинга' }] }],
-          },
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Управление производительностью — устанавливайте цели и собирайте обратную связь' }] }],
-          },
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Развитие и обучение — создавайте планы обучения' }] }],
-          },
-        ],
-      },
-      {
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: 'Быстрый старт' }],
-      },
-      {
-        type: 'orderedList',
-        content: [
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Войдите в систему с вашей учетной записью' }] }],
-          },
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Выберите необходимый модуль из боковой панели' }] }],
-          },
-          {
-            type: 'listItem',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Следуйте подсказкам в интерфейсе' }] }],
-          },
-        ],
-      },
-    ],
-  },
+  share_token?: string
+  content: any
 }
 
 export default function DocPage() {
   const params = useParams()
   const id = params?.id as string
-  const [doc, setDoc] = useState(mockDocument)
+  const [doc, setDoc] = useState<DocumentData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const shareUrl = doc.access === 'external' && doc.shareToken
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${doc.shareToken}`
+  useEffect(() => {
+    fetchDocument()
+  }, [id])
+
+  const fetchDocument = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      setDoc(data)
+    } catch (error) {
+      console.error('Error fetching document:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-slate-600">Загрузка документа...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!doc) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Link href="/docs" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-6">
+          <ArrowLeft size={16} />
+          Назад к документам
+        </Link>
+        <div className="text-center py-12">
+          <p className="text-lg font-medium text-slate-700">Документ не найден</p>
+        </div>
+      </div>
+    )
+  }
+
+  const shareUrl = doc.access === 'external' && doc.share_token
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${doc.share_token}`
     : null
 
   const handleCopy = () => {
@@ -133,13 +102,13 @@ export default function DocPage() {
   }
 
   const handleToggleShare = (enabled: boolean) => {
-    setDoc((prev) => ({
+    setDoc((prev) => prev ? {
       ...prev,
       access: enabled ? 'external' : 'internal',
-      shareToken: enabled
-        ? prev.shareToken || 'tk_' + Math.random().toString(36).substring(2, 15)
-        : prev.shareToken,
-    }))
+      share_token: enabled
+        ? prev.share_token || 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+        : prev.share_token,
+    } : null)
   }
 
   return (
@@ -174,8 +143,7 @@ export default function DocPage() {
         {/* Meta */}
         <div className="flex flex-wrap gap-5 text-sm text-slate-500 mb-5">
           <span className="flex items-center gap-1.5"><User size={14} />{doc.author}</span>
-          <span className="flex items-center gap-1.5"><Clock size={14} />{new Date(doc.updatedAt).toLocaleDateString('ru-RU')}</span>
-          <span className="flex items-center gap-1.5"><Eye size={14} />{doc.views} просмотров</span>
+          <span className="flex items-center gap-1.5"><Clock size={14} />{new Date(doc.updated_at).toLocaleDateString('ru-RU')}</span>
         </div>
 
         {/* External link */}
@@ -228,7 +196,7 @@ export default function DocPage() {
         <div onClick={() => setShowShare(false)}>
           <ShareDialog
             documentId={doc.id}
-            shareToken={doc.shareToken}
+            shareToken={doc.share_token}
             shareEnabled={doc.access === 'external'}
             onToggleShare={handleToggleShare}
           />

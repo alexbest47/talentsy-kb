@@ -5,7 +5,10 @@ import { ArrowLeft, Save, Lock, Unlock } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
-import Editor from '@/components/editor/editor'
+import dynamic from 'next/dynamic'
+import { createClient } from '@/lib/supabase/client'
+
+const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
 type DocAccess = 'internal' | 'external'
 
@@ -23,12 +26,40 @@ export default function NewDocPage() {
   const [category, setCategory] = useState('Инструкция')
   const [access, setAccess] = useState<DocAccess>('internal')
   const [content, setContent] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
 
-  const handleSubmit = () => {
+  const generateShareToken = () => {
+    return 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  }
+
+  const handleSubmit = async () => {
     if (!title.trim()) return
-    // TODO: Save to Supabase
-    console.log('Creating document:', { title, category, access, content })
-    router.push('/docs')
+
+    setSaving(true)
+    try {
+      const supabase = createClient()
+
+      const documentData = {
+        title,
+        category,
+        access,
+        content,
+        author: 'Администратор',
+        share_token: access === 'external' ? generateShareToken() : null,
+      }
+
+      const { error } = await supabase
+        .from('documents')
+        .insert([documentData])
+
+      if (error) throw error
+
+      router.push('/docs')
+    } catch (error) {
+      console.error('Error creating document:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -134,11 +165,11 @@ export default function NewDocPage() {
         <div className="flex gap-3 pt-2">
           <button
             onClick={handleSubmit}
-            disabled={!title.trim()}
+            disabled={!title.trim() || saving}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             <Save size={18} />
-            Создать документ
+            {saving ? 'Сохранение...' : 'Создать документ'}
           </button>
           <Link href="/docs">
             <button className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium text-sm transition-colors">
