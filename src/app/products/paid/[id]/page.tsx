@@ -26,7 +26,6 @@ import {
   Lock,
   Unlock,
   Link as LinkIcon,
-  Save,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
@@ -209,87 +208,151 @@ function DocEditorModal({
   initialDoc,
   defaultCategory,
   productId,
-  onSave,
   onClose,
 }: {
   initialDoc?: DocItem | null
   defaultCategory: string
   productId: string
-  onSave: (data: DocItem) => void
-  onClose: () => void
+  onClose: (savedDoc?: DocItem) => void
 }) {
   const isNew = !initialDoc
   const [title, setTitle] = useState(initialDoc?.title || '')
   const [access, setAccess] = useState<DocAccess>(initialDoc?.access || 'internal')
   const [content, setContent] = useState<any>(initialDoc?.content || null)
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'new'>( isNew ? 'new' : 'saved')
-  const [hasSavedOnce, setHasSavedOnce] = useState(!isNew)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
-  // Refs to track latest values for auto-save interval
+  // Refs for auto-save (avoid closures capturing stale state)
   const titleRef = useRef(title)
   const contentRef = useRef(content)
   const accessRef = useRef(access)
-  const hasSavedOnceRef = useRef(hasSavedOnce)
-  const docIdRef = useRef(initialDoc?.id || '')
+  const docIdRef = useRef<string | null>(initialDoc?.id || null)
+  const shareTokenRef = useRef<string | null>(initialDoc?.share_token || null)
   const dirtyRef = useRef(false)
+  const savingRef = useRef(false)
+  const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   titleRef.current = title
   contentRef.current = content
   accessRef.current = access
-  hasSavedOnceRef.current = hasSavedOnce
 
-  // Mark dirty on changes
+  // Mark dirty on any content/title/access change (skip initial render)
+  const isFirstRender = useRef(true)
   useEffect(() => {
-    if (hasSavedOnce || !isNew) {
-      dirtyRef.current = true
-      setSaveStatus('unsaved')
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
     }
+    dirtyRef.current = true
   }, [title, content, access])
 
-  const buildDocData = useCallback((): DocItem => {
-    return {
-      id: docIdRef.current || generateId(),
-      title: titleRef.current.trim(),
-      content: contentRef.current,
-      category: defaultCategory,
-      access: accessRef.current,
-      share_token: accessRef.current === 'external' ? (initialDoc?.share_token || generateShareToken()) : null,
-      author: initialDoc?.author || 'Администратор',
-      product_id: productId,
-      created_at: initialDoc?.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-  }, [defaultCategory, productId, initialDoc])
+  // Direct Supabase save — no parent involvement, no re-renders
+  const saveToSupabase = useCallback(async () => {
+    if (savingRef.current) return
+    if (!titleRef.current.trim()) return
 
-  const handleSave = () => {
-    if (!title.trim()) return
-    const docData = buildDocData()
-    onSave(docData)
-    docIdRef.current = docData.id
-    setHasSavedOnce(true)
-    dirtyRef.current = false
-    setSaveStatus('saved')
-  }
+    savingRef.current = true
+    setSaveStatus('saving')
+
+    try {
+      const supabase = createClient()
+      const currentAccess = accessRef.current
+
+      // Generate share token if needed
+      if (currentAccess === 'external' && !shareTokenRef.current) {
+        shareTokenRef.current = generateShareToken()
+      }
+      if (currentAccess === 'internal') {
+        shareTokenRef.current = null
+      }
+
+      if (docIdRef.current) {
+        // UPDATE existing
+        await supabase
+          .from('documents')
+          .update({
+            title: titleRef.current.trim(),
+            content: contentRef.current,
+            category: defaultCategory,
+            access: currentAccess,
+            share_token: shareTokenRef.current,
+            product_id: productId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', docIdRef.current)
+      } else {
+        // INSERT new — let Supabase generate UUID
+        const { data: inserted } = await supabase
+          .from('documents')
+          .insert({
+            title: titleRef.current.trim(),
+            content: contentRef.current,
+            category: defaultCategory,
+            access: currentAccess,
+            share_token: shareTokenRef.current,
+            product_id: productId,
+            author: 'Администратор',
+          })
+          .select()
+          .single()
+
+        if (inserted) {
+          docIdRef.current = inserted.id
+        }
+      }
+
+      dirtyRef.current = false
+      setSaveStatus('saved')
+
+      // Clear "saved" badge after 2 seconds
+      if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current)
+      saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (err) {
+      console.error('Auto-save error:', err)
+    } finally {
+      savingRef.current = false
+    }
+  }, [defaultCategory, productId])
 
   // Auto-save every 3 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       if (dirtyRef.current && titleRef.current.trim()) {
-        setSaveStatus('saving')
-        const docData = buildDocData()
-        onSave(docData)
-        docIdRef.current = docData.id
-        setHasSavedOnce(true)
-        hasSavedOnceRef.current = true
-        dirtyRef.current = false
-        setTimeout(() => setSaveStatus('saved'), 500)
+        saveToSupabase()
       }
     }, 3000)
-
     return () => clearInterval(interval)
-  }, [buildDocData, onSave])
+  }, [saveToSupabase])
 
-  const statusLabel = saveStatus === 'saving' ? 'Сохранение...' : saveStatus === 'saved' ? 'Сохранено' : saveStatus === 'unsaved' ? 'Не сохранено' : ''
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current)
+    }
+  }, [])
+
+  // On close: save final state if dirty, then tell parent to refresh
+  const handleClose = async () => {
+    if (dirtyRef.current && titleRef.current.trim()) {
+      await saveToSupabase()
+    }
+    // Build the final doc data so parent can update its list
+    if (docIdRef.current) {
+      onClose({
+        id: docIdRef.current,
+        title: titleRef.current.trim(),
+        content: contentRef.current,
+        category: defaultCategory,
+        access: accessRef.current,
+        share_token: shareTokenRef.current,
+        product_id: productId,
+        author: initialDoc?.author || 'Администратор',
+        created_at: initialDoc?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    } else {
+      onClose()
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
@@ -297,20 +360,20 @@ function DocEditorModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-bold text-slate-900">
-              {isNew && !hasSavedOnce ? 'Новый документ' : 'Редактировать документ'}
+              {isNew && !docIdRef.current ? 'Новый документ' : 'Редактировать документ'}
             </h2>
-            {saveStatus !== 'new' && (
-              <span className={clsx(
-                'text-xs font-medium px-2 py-0.5 rounded',
-                saveStatus === 'saved' && 'bg-green-100 text-green-600',
-                saveStatus === 'saving' && 'bg-yellow-100 text-yellow-600',
-                saveStatus === 'unsaved' && 'bg-slate-100 text-slate-500',
-              )}>
-                {statusLabel}
+            {saveStatus === 'saving' && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded bg-yellow-100 text-yellow-600">
+                Сохранение...
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded bg-green-100 text-green-600">
+                Сохранено
               </span>
             )}
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
+          <button onClick={handleClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
         </div>
 
         <div className="px-6 py-4 space-y-4">
@@ -350,11 +413,7 @@ function DocEditorModal({
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">Закрыть</button>
-          <button onClick={handleSave} disabled={!title.trim()} className="inline-flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium transition-colors">
-            <Save size={16} />
-            Сохранить сейчас
-          </button>
+          <button onClick={handleClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">Закрыть</button>
         </div>
       </div>
     </div>
@@ -538,66 +597,20 @@ export default function ProductDetailPage() {
     setEditorOpen(true)
   }
 
-  const handleSave = async (data: DocItem) => {
-    try {
-      const supabase = createClient()
-      const isExisting = docs.some((d) => d.id === data.id)
-
-      if (isExisting) {
-        // Update existing document
-        const { error } = await supabase
-          .from('documents')
-          .update({
-            title: data.title,
-            content: data.content,
-            category: data.category,
-            access: data.access,
-            share_token: data.share_token,
-            product_id: data.product_id,
-            author: data.author,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', data.id)
-
-        if (error) {
-          console.error('Error updating document:', error)
-          alert('Ошибка при сохранении: ' + error.message)
-          return
+  // Called when the editor modal closes — refresh local docs list
+  const handleEditorClose = (savedDoc?: DocItem) => {
+    if (savedDoc) {
+      setDocs((prev) => {
+        const exists = prev.some((d) => d.id === savedDoc.id)
+        if (exists) {
+          return prev.map((d) => (d.id === savedDoc.id ? savedDoc : d))
+        } else {
+          return [...prev, savedDoc]
         }
-
-        setDocs((prev) => prev.map((d) => (d.id === data.id ? data : d)))
-      } else {
-        // Insert new document — don't send id, let Supabase generate UUID
-        const { data: inserted, error } = await supabase
-          .from('documents')
-          .insert({
-            title: data.title,
-            content: data.content,
-            category: data.category,
-            access: data.access,
-            share_token: data.share_token,
-            product_id: data.product_id,
-            author: data.author,
-          })
-          .select()
-          .single()
-
-        if (error) {
-          console.error('Error inserting document:', error)
-          alert('Ошибка при создании: ' + error.message)
-          return
-        }
-
-        if (inserted) {
-          setDocs((prev) => [...prev, inserted])
-        }
-      }
-
-      setEditorOpen(false)
-      setEditingDoc(null)
-    } catch (err) {
-      console.error('Error saving document:', err)
+      })
     }
+    setEditorOpen(false)
+    setEditingDoc(null)
   }
 
   const handleDelete = async (id: string) => {
@@ -751,8 +764,7 @@ export default function ProductDetailPage() {
           initialDoc={editingDoc}
           defaultCategory={editorCategory}
           productId={productId}
-          onSave={handleSave}
-          onClose={() => { setEditorOpen(false); setEditingDoc(null) }}
+          onClose={handleEditorClose}
         />
       )}
       {viewingDoc && (

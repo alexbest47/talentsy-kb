@@ -12,15 +12,6 @@ const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false 
 
 type DocAccess = 'internal' | 'external'
 
-interface DocumentData {
-  id: string
-  title: string
-  category: string
-  access: DocAccess
-  content: any
-  share_token?: string
-}
-
 const categories = [
   'Инструкция',
   'Регламент',
@@ -28,6 +19,30 @@ const categories = [
   'Описание продукта',
   'Описание аудитории',
 ]
+
+// Tiny component that shows save status without re-rendering the whole page
+function SaveStatusBadge({ statusRef }: { statusRef: React.RefObject<string> }) {
+  const [display, setDisplay] = useState<string>('')
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDisplay(statusRef.current || '')
+    }, 300)
+    return () => clearInterval(interval)
+  }, [statusRef])
+
+  if (!display) return null
+
+  return (
+    <span className={clsx(
+      'text-xs font-medium px-2 py-0.5 rounded transition-opacity',
+      display === 'saving' && 'bg-yellow-100 text-yellow-600',
+      display === 'saved' && 'bg-green-100 text-green-600',
+    )}>
+      {display === 'saving' ? 'Сохранение...' : 'Сохранено'}
+    </span>
+  )
+}
 
 export default function EditDocPage() {
   const params = useParams()
@@ -39,17 +54,18 @@ export default function EditDocPage() {
   const [access, setAccess] = useState<DocAccess>('internal')
   const [content, setContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const [shareToken, setShareToken] = useState<string | null>(null)
 
+  // All refs for auto-save — no state changes during background save
   const titleRef = useRef(title)
   const contentRef = useRef(content)
   const categoryRef = useRef(category)
   const accessRef = useRef(access)
   const shareTokenRef = useRef(shareToken)
   const dirtyRef = useRef(false)
+  const savingRef = useRef(false)
   const initialLoadRef = useRef(true)
+  const saveStatusRef = useRef<string>('')
 
   titleRef.current = title
   contentRef.current = content
@@ -61,7 +77,6 @@ export default function EditDocPage() {
   useEffect(() => {
     if (initialLoadRef.current) return
     dirtyRef.current = true
-    setSaveStatus('unsaved')
   }, [title, content, category, access])
 
   useEffect(() => {
@@ -90,24 +105,26 @@ export default function EditDocPage() {
       console.error('Error fetching document:', error)
     } finally {
       setLoading(false)
-      // Allow dirty tracking after initial load settles
       setTimeout(() => { initialLoadRef.current = false }, 500)
     }
   }
 
-  const doSave = useCallback(async (redirect = false) => {
+  // Background save — uses only refs, no setState calls that would re-render page
+  const backgroundSave = useCallback(async () => {
+    if (savingRef.current) return
     if (!titleRef.current.trim()) return
 
-    setSaving(true)
-    setSaveStatus('saving')
+    savingRef.current = true
+    saveStatusRef.current = 'saving'
+
     try {
       const supabase = createClient()
 
       const newShareToken = accessRef.current === 'external' && !shareTokenRef.current
         ? 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-        : shareTokenRef.current
+        : accessRef.current === 'internal' ? null : shareTokenRef.current
 
-      const { error } = await supabase
+      await supabase
         .from('documents')
         .update({
           title: titleRef.current,
@@ -119,32 +136,33 @@ export default function EditDocPage() {
         })
         .eq('id', id)
 
-      if (error) throw error
-
       dirtyRef.current = false
-      setSaveStatus('saved')
-
-      if (redirect) {
-        router.push(`/docs/${id}`)
-      }
+      saveStatusRef.current = 'saved'
+      setTimeout(() => { saveStatusRef.current = '' }, 2000)
     } catch (error) {
-      console.error('Error updating document:', error)
+      console.error('Auto-save error:', error)
+      saveStatusRef.current = ''
     } finally {
-      setSaving(false)
+      savingRef.current = false
     }
-  }, [id, router])
-
-  const handleSave = () => doSave(true)
+  }, [id])
 
   // Auto-save every 3 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       if (dirtyRef.current && titleRef.current.trim()) {
-        doSave(false)
+        backgroundSave()
       }
     }, 3000)
     return () => clearInterval(interval)
-  }, [doSave])
+  }, [backgroundSave])
+
+  // Manual save + redirect
+  const handleSaveAndClose = async () => {
+    if (!titleRef.current.trim()) return
+    await backgroundSave()
+    router.push(`/docs/${id}`)
+  }
 
   if (loading) {
     return (
@@ -166,16 +184,7 @@ export default function EditDocPage() {
           </button>
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">Редактировать документ</h1>
-        {saveStatus !== 'saved' || saving ? (
-          <span className={clsx(
-            'text-xs font-medium px-2 py-0.5 rounded',
-            saveStatus === 'saved' && 'bg-green-100 text-green-600',
-            saveStatus === 'saving' && 'bg-yellow-100 text-yellow-600',
-            saveStatus === 'unsaved' && 'bg-slate-100 text-slate-500',
-          )}>
-            {saveStatus === 'saving' ? 'Сохранение...' : saveStatus === 'saved' ? 'Сохранено' : 'Не сохранено'}
-          </span>
-        ) : null}
+        <SaveStatusBadge statusRef={saveStatusRef} />
       </div>
 
       <div className="space-y-5">
@@ -268,16 +277,16 @@ export default function EditDocPage() {
         {/* Actions */}
         <div className="flex gap-3 pt-2">
           <button
-            onClick={handleSave}
-            disabled={!title.trim() || saving}
+            onClick={handleSaveAndClose}
+            disabled={!title.trim()}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             <Save size={18} />
-            {saving ? 'Сохранение...' : 'Сохранить изменения'}
+            Сохранить и выйти
           </button>
           <Link href={`/docs/${id}`}>
             <button className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium text-sm transition-colors">
-              Отмена
+              Назад
             </button>
           </Link>
         </div>
