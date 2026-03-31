@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { Lock } from 'lucide-react'
-import Editor from '@/components/editor/editor'
+
+const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
 interface SharedDocument {
   title: string
