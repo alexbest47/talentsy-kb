@@ -249,6 +249,15 @@ function DocEditorModal({
       const supabase = createClient()
       const currentAccess = accessRef.current
 
+      // Ensure content is a proper JSON object for jsonb column
+      let contentToSave = contentRef.current
+      if (typeof contentToSave === 'string') {
+        contentToSave = {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: contentToSave }] }]
+        }
+      }
+
       // Generate share token if needed
       if (currentAccess === 'external' && !shareTokenRef.current) {
         shareTokenRef.current = generateShareToken()
@@ -263,7 +272,7 @@ function DocEditorModal({
           .from('documents')
           .update({
             title: titleRef.current.trim(),
-            content: contentRef.current,
+            content: contentToSave,
             category: defaultCategory,
             access: currentAccess,
             share_token: shareTokenRef.current,
@@ -284,7 +293,7 @@ function DocEditorModal({
           .from('documents')
           .insert({
             title: titleRef.current.trim(),
-            content: contentRef.current,
+            content: contentToSave,
             category: defaultCategory,
             access: currentAccess,
             share_token: shareTokenRef.current,
@@ -851,45 +860,15 @@ export default function ProductDetailPage() {
         <div className="text-center py-12 text-slate-400">Загрузка документов...</div>
       ) : (
         <>
-          {/* Описание программы */}
+          {/* Описание продукта */}
           <DocumentSection
-            title="Описание программы"
+            title="Описание продукта"
             icon={<BookOpen size={18} />}
             iconBg="bg-purple-100"
             iconColor="text-purple-600"
-            category="Описание программы"
+            category="Описание продукта"
             docs={docs}
-            onAdd={() => handleAdd('Описание программы')}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onToggleAccess={handleToggleAccess}
-            onView={(d) => setViewingDoc(d)}
-          />
-
-          {/* Описание аудитории */}
-          <DocumentSection
-            title="Описание аудитории"
-            icon={<Target size={18} />}
-            iconBg="bg-blue-100"
-            iconColor="text-blue-600"
-            category="Описание аудитории"
-            docs={docs}
-            onAdd={() => handleAdd('Описание аудитории')}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onToggleAccess={handleToggleAccess}
-            onView={(d) => setViewingDoc(d)}
-          />
-
-          {/* Кейсы */}
-          <DocumentSection
-            title="Кейсы по программе"
-            icon={<FileText size={18} />}
-            iconBg="bg-amber-100"
-            iconColor="text-amber-600"
-            category="Кейс"
-            docs={docs}
-            onAdd={() => handleAdd('Кейс')}
+            onAdd={() => handleAdd('Описание продукта')}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onToggleAccess={handleToggleAccess}

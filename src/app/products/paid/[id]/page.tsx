@@ -270,6 +270,15 @@ function DocEditorModal({
       const supabase = createClient()
       const currentAccess = accessRef.current
 
+      // Ensure content is a proper JSON object for jsonb column
+      let contentToSave = contentRef.current
+      if (typeof contentToSave === 'string') {
+        contentToSave = {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: contentToSave }] }]
+        }
+      }
+
       // Generate share token if needed
       if (currentAccess === 'external' && !shareTokenRef.current) {
         shareTokenRef.current = generateShareToken()
@@ -284,7 +293,7 @@ function DocEditorModal({
           .from('documents')
           .update({
             title: titleRef.current.trim(),
-            content: contentRef.current,
+            content: contentToSave,
             category: defaultCategory,
             access: currentAccess,
             share_token: shareTokenRef.current,
@@ -305,7 +314,7 @@ function DocEditorModal({
           .from('documents')
           .insert({
             title: titleRef.current.trim(),
-            content: contentRef.current,
+            content: contentToSave,
             category: defaultCategory,
             access: currentAccess,
             share_token: shareTokenRef.current,
