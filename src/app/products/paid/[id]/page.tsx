@@ -585,11 +585,23 @@ function DocumentSection({
 
 // ========== MAIN PAGE ==========
 
+interface DbProduct {
+  slug: string
+  name: string
+  category: string
+  description: string
+  site_url: string
+  product_type: string
+  image_url: string
+}
+
 export default function ProductDetailPage() {
   const params = useParams()
   const productId = params.id as string
-  const product = productDetails[productId]
+  const hardcodedProduct = productDetails[productId]
 
+  const [product, setProduct] = useState<DbProduct | null>(null)
+  const [productLoading, setProductLoading] = useState(true)
   const [docs, setDocs] = useState<DocItem[]>([])
   const [loading, setLoading] = useState(true)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -597,20 +609,41 @@ export default function ProductDetailPage() {
   const [editingDoc, setEditingDoc] = useState<DocItem | null>(null)
   const [viewingDoc, setViewingDoc] = useState<DocItem | null>(null)
   const [editingProduct, setEditingProduct] = useState(false)
-  const [editName, setEditName] = useState(product?.name || '')
-  const [editCategory, setEditCategory] = useState(product?.category || '')
-  const [editSiteUrl, setEditSiteUrl] = useState(product?.siteUrl || '')
+  const [editName, setEditName] = useState('')
+  const [editCategory, setEditCategory] = useState('')
+  const [editSiteUrl, setEditSiteUrl] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [savingProduct, setSavingProduct] = useState(false)
 
-  // Fetch product description from Supabase
+  // Fetch product from Supabase
   useEffect(() => {
-    const fetchProductInfo = async () => {
+    const fetchProduct = async () => {
       const supabase = createClient()
-      const { data } = await supabase.from('products').select('description').eq('slug', productId).single()
-      if (data?.description) setEditDescription(data.description)
+      const { data } = await supabase.from('products').select('*').eq('slug', productId).single()
+      if (data) {
+        setProduct(data)
+        setEditName(data.name || hardcodedProduct?.name || '')
+        setEditCategory(data.category || hardcodedProduct?.category || '')
+        setEditSiteUrl(data.site_url || hardcodedProduct?.siteUrl || '')
+        setEditDescription(data.description || '')
+      } else if (hardcodedProduct) {
+        // Fallback to hardcoded data
+        setProduct({
+          slug: hardcodedProduct.id,
+          name: hardcodedProduct.name,
+          category: hardcodedProduct.category,
+          description: '',
+          site_url: hardcodedProduct.siteUrl,
+          product_type: 'paid',
+          image_url: '',
+        })
+        setEditName(hardcodedProduct.name)
+        setEditCategory(hardcodedProduct.category)
+        setEditSiteUrl(hardcodedProduct.siteUrl)
+      }
+      setProductLoading(false)
     }
-    if (productId) fetchProductInfo()
+    if (productId) fetchProduct()
   }, [productId])
 
   const handleSaveProduct = async () => {
@@ -747,6 +780,14 @@ export default function ProductDetailPage() {
     }
   }
 
+  if (productLoading) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-20">
+        <p className="text-slate-400 text-lg">Загрузка...</p>
+      </div>
+    )
+  }
+
   if (!product) {
     return (
       <div className="max-w-4xl mx-auto text-center py-20">
@@ -803,7 +844,7 @@ export default function ProductDetailPage() {
         ) : (
           <>
             <div className="flex flex-wrap gap-2 mb-3">
-              {product.tags.map((tag) => (<TagBadge key={tag} tag={tag} />))}
+              {hardcodedProduct?.tags?.map((tag) => (<TagBadge key={tag} tag={tag} />))}
               <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">{product.category}</span>
             </div>
             <div className="flex items-center gap-3 mb-2">
@@ -815,7 +856,7 @@ export default function ProductDetailPage() {
             {editDescription && (
               <p className="text-slate-600 text-sm mb-4">{editDescription}</p>
             )}
-            <a href={editSiteUrl || product.siteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <a href={editSiteUrl || product.site_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">
               <Globe size={16} /> Страница программы на сайте <ExternalLink size={14} />
             </a>
           </>

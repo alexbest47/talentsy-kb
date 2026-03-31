@@ -265,20 +265,6 @@ function CreateProductModal({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Тип программы
-            </label>
-            <select
-              value={formData.productType}
-              onChange={(e) => setFormData({ ...formData, productType: e.target.value as 'paid' | 'free' })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
-            >
-              <option value="paid">Платная</option>
-              <option value="free">Бесплатная</option>
-            </select>
-          </div>
-
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -324,10 +310,11 @@ export default function PaidProductsPage() {
       if (tagsError) throw tagsError
       setTags(tagsData || [])
 
-      // Fetch products
+      // Fetch products (only paid)
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
+        .eq('product_type', 'paid')
         .order('updated_at', { ascending: false })
       if (productsError) throw productsError
 
