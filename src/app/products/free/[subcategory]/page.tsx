@@ -36,11 +36,11 @@ interface ProductWithTags extends DbProduct {
   tags: DbTag[]
 }
 
-const SUBCATEGORIES: Record<string, { title: string; description: string; dbCategory: string }> = {
-  'webinars': { title: 'Вебинары', description: 'Бесплатные вебинары Talentsy по психологии, арт-терапии, стилю и дизайну', dbCategory: 'Вебинар' },
-  'mini-courses': { title: 'Мини-курсы', description: 'Бесплатные мини-курсы Talentsy для быстрого погружения в тему', dbCategory: 'Мини-курс' },
-  'diagnostics': { title: 'Диагностики', description: 'Бесплатные диагностики и тесты от Talentsy', dbCategory: 'Диагностика' },
-  'pdf': { title: 'PDF-материалы', description: 'Бесплатные PDF-гайды, чек-листы и рабочие тетради от Talentsy', dbCategory: 'PDF' },
+const SUBCATEGORIES: Record<string, { title: string; description: string; dbCategory: string; addButtonLabel: string }> = {
+  'webinars': { title: 'Вебинары', description: 'Бесплатные вебинары Talentsy по психологии, арт-терапии, стилю и дизайну', dbCategory: 'Вебинар', addButtonLabel: 'Добавить вебинар' },
+  'mini-courses': { title: 'Мини-курсы', description: 'Бесплатные мини-курсы Talentsy для быстрого погружения в тему', dbCategory: 'Мини-курс', addButtonLabel: 'Добавить мини-курс' },
+  'diagnostics': { title: 'Диагностики', description: 'Бесплатные диагностики и тесты от Talentsy', dbCategory: 'Диагностика', addButtonLabel: 'Добавить диагностику' },
+  'pdf': { title: 'PDF-материалы', description: 'Бесплатные PDF-гайды, чек-листы и рабочие тетради от Talentsy', dbCategory: 'PDF', addButtonLabel: 'Добавить PDF' },
 }
 
 const transliterateToSlug = (text: string): string => {
@@ -239,7 +239,7 @@ function CreateProductModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Добавить программу</h2>
+          <h2 className="text-lg font-bold text-slate-900">{dbCategory === 'Вебинар' ? 'Добавить вебинар' : dbCategory === 'Мини-курс' ? 'Добавить мини-курс' : dbCategory === 'Диагностика' ? 'Добавить диагностику' : 'Добавить PDF'}</h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -477,7 +477,7 @@ export default function FreeProductsSubcategoryPage() {
           className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors whitespace-nowrap"
         >
           <Plus size={18} />
-          Добавить программу
+          {subcategory.addButtonLabel}
         </button>
       </div>
 
