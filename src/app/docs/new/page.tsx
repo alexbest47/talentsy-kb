@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { ArrowLeft, Save, Lock, Unlock, Building2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -31,6 +31,14 @@ const departmentNames: Record<string, string> = {
 }
 
 export default function NewDocPage() {
+  return (
+    <Suspense fallback={<div className="max-w-4xl mx-auto py-20 text-center text-slate-500">Загрузка...</div>}>
+      <NewDocPageContent />
+    </Suspense>
+  )
+}
+
+function NewDocPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const departmentSlug = searchParams.get('department')
