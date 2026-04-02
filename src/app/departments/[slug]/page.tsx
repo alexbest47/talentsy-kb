@@ -1087,4 +1087,34 @@ export default function DepartmentPage() {
             className={clsx(
               'px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 -mb-[2px]',
               activeTab === tab.id
-                ? 'text-purp
+                ? 'text-purple-600 border-purple-600'
+                : 'text-slate-500 hover:text-slate-700 border-transparent'
+            )}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-white border border-slate-200 rounded-b-lg rounded-tr-lg p-6">
+        {activeTab === 'vision' && <VisionTab slug={slug} />}
+        {activeTab === 'goals' && <GoalsTab slug={slug} />}
+        {activeTab === 'structure' && (
+          <StructureTab
+            dept={dept}
+            units={units}
+            employees={employees}
+            onEmployeeEdit={handleEmployeeEdit}
+            onEmployeeAdd={handleEmployeeAdd}
+            onEmployeeDelete={handleEmployeeDelete}
+            onUnitAdd={handleUnitAdd}
+          />
+        )}
+        {activeTab === 'documents' && <DocumentsTab slug={slug} />}
+        {activeTab === 'services' && <ServicesTab slug={slug} />}
+      </div>
+    </div>
+  )
+}
