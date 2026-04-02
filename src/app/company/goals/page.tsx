@@ -73,9 +73,11 @@ function DepartmentSection({ dept }: { dept: DepartmentGoals }) {
             <h3 className="font-bold text-slate-900">{dept.department}</h3>
             {dept.role && <p className="text-xs text-slate-500 mt-0.5">{dept.role}</p>}
           </div>
-          <span className="text-xs text-slate-500 ml-auto mr-2">{dept.goals.length} {dept.goals.length === 1 ? 'цель' : dept.goals.length < 5 ? 'цели' : 'целей'}</span>
         </div>
-        {expanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">{dept.goals.length} {dept.goals.length === 1 ? 'цель' : dept.goals.length < 5 ? 'цели' : 'целей'}</span>
+          {expanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
+        </div>
       </button>
 
       {expanded && (
