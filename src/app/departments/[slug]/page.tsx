@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x3, FileText, Zap, Check, X } from 'lucide-react'
+import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x3, FileText, Zap, Check, X, Eye } from 'lucide-react'
 import clsx from 'clsx'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -596,6 +596,99 @@ function DocumentsTab({ slug }: { slug: string }) {
   )
 }
 
+function renderTiptapContent(node: any): React.ReactNode {
+  if (!node) return null
+
+  if (node.type === 'text') {
+    let content: React.ReactNode = node.text
+    if (node.marks) {
+      for (const mark of node.marks) {
+        if (mark.type === 'bold') content = <strong>{content}</strong>
+        if (mark.type === 'italic') content = <em>{content}</em>
+      }
+    }
+    return content
+  }
+
+  const children = node.content?.map((child: any, i: number) => (
+    <span key={i}>{renderTiptapContent(child)}</span>
+  ))
+
+  switch (node.type) {
+    case 'doc':
+      return <>{node.content?.map((child: any, i: number) => <div key={i}>{renderTiptapContent(child)}</div>)}</>
+    case 'heading': {
+      const level = node.attrs?.level || 2
+      const Tag = `h${level}` as keyof JSX.IntrinsicElements
+      const styles: Record<number, string> = {
+        1: 'text-2xl font-bold text-slate-900 mt-8 mb-4 first:mt-0',
+        2: 'text-xl font-bold text-slate-800 mt-6 mb-3 border-b border-slate-200 pb-2',
+        3: 'text-lg font-semibold text-slate-700 mt-4 mb-2',
+      }
+      return <Tag className={styles[level] || styles[3]}>{children}</Tag>
+    }
+    case 'paragraph':
+      return <p className="text-sm text-slate-600 leading-relaxed mb-3">{children}</p>
+    case 'bulletList':
+      return <ul className="list-disc list-inside space-y-1 mb-3 ml-2">{node.content?.map((child: any, i: number) => <li key={i} className="text-sm text-slate-600">{renderTiptapContent(child)}</li>)}</ul>
+    case 'listItem':
+      return <>{node.content?.map((child: any, i: number) => {
+        if (child.type === 'paragraph') {
+          return child.content?.map((c: any, j: number) => <span key={j}>{renderTiptapContent(c)}</span>)
+        }
+        return <span key={i}>{renderTiptapContent(child)}</span>
+      })}</>
+    default:
+      return children
+  }
+}
+
+function VisionTab({ slug }: { slug: string }) {
+  const [content, setContent] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchVision = async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('department_vision')
+        .select('content')
+        .eq('department_slug', slug)
+        .single()
+
+      if (!error && data) {
+        setContent(data.content)
+      }
+      setLoading(false)
+    }
+
+    fetchVision()
+  }, [slug])
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-slate-500">Загружаем видение...</p>
+      </div>
+    )
+  }
+
+  if (!content) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-500 mb-2">Видение отдела ещё не описано</p>
+        <p className="text-xs text-slate-400">Здесь будет стратегическое видение работы отдела</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="prose-sm max-w-none">
+      {renderTiptapContent(content)}
+    </div>
+  )
+}
+
 function ServicesTab({ slug }: { slug: string }) {
   const [links, setLinks] = useState<DepartmentLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -685,7 +778,7 @@ function ServicesTab({ slug }: { slug: string }) {
 export default function DepartmentPage() {
   const params = useParams()
   const slug = params?.slug as string
-  const [activeTab, setActiveTab] = useState<'structure' | 'goals' | 'documents' | 'services'>('goals')
+  const [activeTab, setActiveTab] = useState<'vision' | 'structure' | 'goals' | 'documents' | 'services'>('vision')
   const [dept, setDept] = useState<DepartmentData | null>(null)
   const [units, setUnits] = useState<OrgUnit[]>([])
   const [employees, setEmployees] = useState<OrgEmployee[]>([])
@@ -837,6 +930,7 @@ export default function DepartmentPage() {
   const vacancies = employees.filter((e) => e.is_vacancy).length + (dept.director_is_vacancy ? 1 : 0) + units.filter((u) => u.is_lead_vacancy).length
 
   const tabs = [
+    { id: 'vision' as const, label: 'Видение', icon: Eye },
     { id: 'goals' as const, label: 'Цели', icon: Grid3x3 },
     { id: 'structure' as const, label: 'Структура', icon: Users },
     { id: 'documents' as const, label: 'Документы', icon: FileText },
@@ -902,6 +996,7 @@ export default function DepartmentPage() {
 
       {/* Tab Content */}
       <div className="bg-white rounded-b-lg p-6 border border-slate-200 border-t-0">
+        {activeTab === 'vision' && <VisionTab slug={slug} />}
         {activeTab === 'structure' && (
           <StructureTab
             dept={dept}
