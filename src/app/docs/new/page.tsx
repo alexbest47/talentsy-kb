@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Save, Lock, Unlock } from 'lucide-react'
+import { ArrowLeft, Save, Lock, Unlock, Building2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
@@ -20,8 +20,22 @@ const categories = [
   'Описание аудитории',
 ]
 
+const departmentNames: Record<string, string> = {
+  sales: 'Продажи',
+  marketing: 'Маркетинг',
+  product: 'Продукт',
+  tech: 'Технический',
+  finance: 'Финансы',
+  admin: 'Администрация',
+  hr: 'HR',
+}
+
 export default function NewDocPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const departmentSlug = searchParams.get('department')
+  const departmentName = departmentSlug ? departmentNames[departmentSlug] || departmentSlug : null
+
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('Инструкция')
   const [access, setAccess] = useState<DocAccess>('internal')
@@ -39,7 +53,7 @@ export default function NewDocPage() {
     try {
       const supabase = createClient()
 
-      const documentData = {
+      const documentData: any = {
         title,
         category,
         access,
@@ -48,13 +62,21 @@ export default function NewDocPage() {
         share_token: access === 'external' ? generateShareToken() : null,
       }
 
+      if (departmentSlug) {
+        documentData.department_slug = departmentSlug
+      }
+
       const { error } = await supabase
         .from('documents')
         .insert([documentData])
 
       if (error) throw error
 
-      router.push('/docs')
+      if (departmentSlug) {
+        router.push(`/departments/${departmentSlug}`)
+      } else {
+        router.push('/docs')
+      }
     } catch (error) {
       console.error('Error creating document:', error)
     } finally {
@@ -66,12 +88,20 @@ export default function NewDocPage() {
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/docs">
+        <Link href={departmentSlug ? `/departments/${departmentSlug}` : '/docs'}>
           <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
             <ArrowLeft size={20} className="text-slate-600" />
           </button>
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900">Создать документ</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Создать документ</h1>
+          {departmentName && (
+            <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
+              <Building2 size={14} />
+              Отдел: {departmentName}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="space-y-5">
@@ -171,7 +201,7 @@ export default function NewDocPage() {
             <Save size={18} />
             {saving ? 'Сохранение...' : 'Создать документ'}
           </button>
-          <Link href="/docs">
+          <Link href={departmentSlug ? `/departments/${departmentSlug}` : '/docs'}>
             <button className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium text-sm transition-colors">
               Отмена
             </button>

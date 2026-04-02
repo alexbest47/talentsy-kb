@@ -48,11 +48,25 @@ interface DepartmentGoal {
   created_at: string
 }
 
+interface PositionGoal {
+  id: string
+  quarter: string
+  text: string
+  metric: string | null
+  status: string
+  sort_order: number
+  position_id: string
+  department: string
+  role: string | null
+  position_title: string
+  position_holder: string
+}
+
 interface Document {
   id: string
-  product_id: string
+  department_slug: string
   title: string
-  url: string
+  category: string | null
   created_at: string
 }
 
@@ -413,34 +427,75 @@ function StructureTab({
 }
 
 function GoalsTab({ slug }: { slug: string }) {
-  const [goals, setGoals] = useState<DepartmentGoal[]>([])
+  const [goals, setGoals] = useState<PositionGoal[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedQuarter, setSelectedQuarter] = useState('Q2-2026')
 
   useEffect(() => {
     const fetchGoals = async () => {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('department_goals')
-        .select('*')
+
+      // 1. Get director position_id from org_departments
+      const { data: dept } = await supabase
+        .from('org_departments')
+        .select('director_position_id')
+        .eq('slug', slug)
+        .single()
+
+      // 2. Get all org_units position_ids for this department
+      const { data: units } = await supabase
+        .from('org_units')
+        .select('position_id')
         .eq('department_slug', slug)
+
+      // Collect all position IDs for this department
+      const positionIds: string[] = []
+      if (dept?.director_position_id) positionIds.push(dept.director_position_id)
+      if (units) {
+        units.forEach((u: any) => {
+          if (u.position_id && !positionIds.includes(u.position_id)) {
+            positionIds.push(u.position_id)
+          }
+        })
+      }
+
+      if (positionIds.length === 0) {
+        setLoading(false)
+        return
+      }
+
+      // 3. Fetch goals for these positions
+      const { data: goalsData, error } = await supabase
+        .from('goals')
+        .select('id, quarter, text, metric, status, sort_order, position_id, department, role')
+        .in('position_id', positionIds)
         .order('sort_order', { ascending: true })
 
-      if (!error && data) {
-        setGoals(data)
+      if (!error && goalsData) {
+        // 4. Fetch position details for display
+        const { data: positions } = await supabase
+          .from('positions')
+          .select('id, title, holder')
+          .in('id', positionIds)
+
+        const posMap = (positions || []).reduce((acc: any, p: any) => {
+          acc[p.id] = p
+          return acc
+        }, {})
+
+        const enriched = goalsData.map((g: any) => ({
+          ...g,
+          position_title: posMap[g.position_id]?.title || g.department,
+          position_holder: posMap[g.position_id]?.holder || g.role || '',
+        }))
+
+        setGoals(enriched)
       }
       setLoading(false)
     }
 
     fetchGoals()
   }, [slug])
-
-  const goalsGrouped = goals.reduce((acc, goal) => {
-    if (!acc[goal.quarter]) {
-      acc[goal.quarter] = []
-    }
-    acc[goal.quarter].push(goal)
-    return acc
-  }, {} as Record<string, DepartmentGoal[]>)
 
   if (loading) {
     return (
@@ -449,6 +504,24 @@ function GoalsTab({ slug }: { slug: string }) {
       </div>
     )
   }
+
+  // Get available quarters
+  const quarters = [...new Set(goals.map(g => g.quarter))].sort().reverse()
+  const filteredGoals = goals.filter(g => g.quarter === selectedQuarter)
+
+  // Group by position
+  const goalsByPosition = filteredGoals.reduce((acc, goal) => {
+    const key = goal.position_id
+    if (!acc[key]) {
+      acc[key] = {
+        position_title: goal.position_title,
+        position_holder: goal.position_holder,
+        goals: [],
+      }
+    }
+    acc[key].goals.push(goal)
+    return acc
+  }, {} as Record<string, { position_title: string; position_holder: string; goals: PositionGoal[] }>)
 
   if (goals.length === 0) {
     return (
@@ -464,49 +537,71 @@ function GoalsTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      {Object.entries(goalsGrouped).map(([quarter, quarterGoals]) => (
-        <div key={quarter}>
-          <h3 className="text-lg font-bold text-slate-900 mb-3">{quarter}</h3>
-          <div className="space-y-2">
-            {quarterGoals.map((goal) => (
-              <div key={goal.id} className="bg-white border border-slate-200 rounded-lg p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900">{goal.text}</p>
-                    {goal.metric && (
-                      <p className="text-xs text-slate-500 mt-2">Метрика: {goal.metric}</p>
+      {/* Quarter selector */}
+      {quarters.length > 1 && (
+        <div className="flex gap-2">
+          {quarters.map((q) => (
+            <button
+              key={q}
+              onClick={() => setSelectedQuarter(q)}
+              className={clsx(
+                'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                selectedQuarter === q
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              )}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Goals grouped by position */}
+      {Object.entries(goalsByPosition).map(([posId, group]) => (
+        <div key={posId} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{group.position_title}</h3>
+                <p className={clsx(
+                  'text-xs mt-0.5',
+                  group.position_holder ? 'text-slate-500' : 'text-orange-500 font-medium'
+                )}>
+                  {group.position_holder || 'ВАКАНСИЯ'}
+                </p>
+              </div>
+              <span className="text-xs text-slate-400 font-medium">
+                {group.goals.length} {group.goals.length === 1 ? 'цель' : group.goals.length < 5 ? 'цели' : 'целей'}
+              </span>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {group.goals.map((goal) => (
+              <div key={goal.id} className="px-5 py-3 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className={clsx(
+                    'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
+                    goal.status === 'completed' ? 'bg-green-100' : 'bg-purple-100'
+                  )}>
+                    {goal.status === 'completed' ? (
+                      <Check size={12} className="text-green-600" />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full bg-purple-400" />
                     )}
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className={clsx(
-                        'text-[11px] font-semibold px-2 py-1 rounded',
-                        goal.status === 'завершена' ? 'bg-green-100 text-green-700' :
-                        goal.status === 'в работе' ? 'bg-blue-100 text-blue-700' :
-                        'bg-slate-100 text-slate-700'
-                      )}>
-                        {goal.status}
-                      </span>
-                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors">
-                      <Edit size={16} />
-                    </button>
-                    <button className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                  <p className="text-sm text-slate-700">{goal.text}</p>
                 </div>
+                {goal.metric && (
+                  <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded flex-shrink-0 whitespace-nowrap">
+                    {goal.metric}
+                  </span>
+                )}
               </div>
             ))}
           </div>
         </div>
       ))}
-      <div className="pt-4">
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
-          <Plus size={16} />
-          Добавить цель
-        </button>
-      </div>
     </div>
   )
 }
@@ -520,8 +615,8 @@ function DocumentsTab({ slug }: { slug: string }) {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('documents')
-        .select('*')
-        .eq('product_id', slug)
+        .select('id, title, category, department_slug, created_at')
+        .eq('department_slug', slug)
         .order('created_at', { ascending: false })
 
       if (!error && data) {
@@ -545,10 +640,13 @@ function DocumentsTab({ slug }: { slug: string }) {
     return (
       <div className="text-center py-12">
         <p className="text-slate-500 mb-4">Документов ещё не добавлено</p>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
+        <Link
+          href={`/docs/new?department=${slug}`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+        >
           <Plus size={16} />
           Добавить документ
-        </button>
+        </Link>
       </div>
     )
   }
@@ -565,32 +663,37 @@ function DocumentsTab({ slug }: { slug: string }) {
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-slate-900 truncate">{doc.title}</h3>
                 <p className="text-xs text-slate-500 mt-1">
+                  {doc.category && <span className="text-purple-600">{doc.category} · </span>}
                   {new Date(doc.created_at).toLocaleDateString('ru-RU')}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href={`/docs/${doc.id}`}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 transition-colors"
               >
-                <ExternalLink size={14} />
+                <Eye size={14} />
                 Открыть
-              </a>
-              <button className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors">
+              </Link>
+              <Link
+                href={`/docs/${doc.id}/edit`}
+                className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+              >
                 <Edit size={14} />
-              </button>
+              </Link>
             </div>
           </div>
         ))}
       </div>
       <div className="pt-4">
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
+        <Link
+          href={`/docs/new?department=${slug}`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+        >
           <Plus size={16} />
           Добавить документ
-        </button>
+        </Link>
       </div>
     </div>
   )
@@ -984,34 +1087,4 @@ export default function DepartmentPage() {
             className={clsx(
               'px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 -mb-[2px]',
               activeTab === tab.id
-                ? 'text-purple-600 border-purple-600'
-                : 'text-slate-600 border-transparent hover:text-slate-900'
-            )}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-b-lg p-6 border border-slate-200 border-t-0">
-        {activeTab === 'vision' && <VisionTab slug={slug} />}
-        {activeTab === 'structure' && (
-          <StructureTab
-            dept={dept}
-            units={units}
-            employees={employees}
-            onEmployeeEdit={handleEmployeeEdit}
-            onEmployeeAdd={handleEmployeeAdd}
-            onEmployeeDelete={handleEmployeeDelete}
-            onUnitAdd={handleUnitAdd}
-          />
-        )}
-        {activeTab === 'goals' && <GoalsTab slug={slug} />}
-        {activeTab === 'documents' && <DocumentsTab slug={slug} />}
-        {activeTab === 'services' && <ServicesTab slug={slug} />}
-      </div>
-    </div>
-  )
-}
+                ? 'text-purp
