@@ -107,7 +107,7 @@ function DocPickerModal({
         const { data, error } = await supabase
           .from('documents')
           .select('id, title, category, updated_at')
-          .eq('status', 'published')
+          .eq('category', 'Вакансия')
           .order('updated_at', { ascending: false })
 
         if (error) throw error
@@ -148,7 +148,7 @@ function DocPickerModal({
           <button
             onClick={() => {
               router.push(
-                `/docs/new?title=${encodeURIComponent('Вакансия: ' + vacancy.position)}&category=${encodeURIComponent('Описание вакансии')}&linkPositionId=${vacancy.id}`
+                `/docs/new?title=${encodeURIComponent('Вакансия: ' + vacancy.position)}&category=${encodeURIComponent('Вакансия')}&linkPositionId=${vacancy.id}`
               )
             }}
             className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"

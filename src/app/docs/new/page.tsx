@@ -18,6 +18,7 @@ const categories = [
   'Кейс',
   'Описание программы',
   'Описание аудитории',
+  'Вакансия',
 ]
 
 const departmentNames: Record<string, string> = {
@@ -43,9 +44,11 @@ function NewDocPageContent() {
   const searchParams = useSearchParams()
   const departmentSlug = searchParams.get('department')
   const departmentName = departmentSlug ? departmentNames[departmentSlug] || departmentSlug : null
+  const initialTitle = searchParams.get('title') || ''
+  const initialCategory = searchParams.get('category') || 'Инструкция'
 
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('Инструкция')
+  const [title, setTitle] = useState(initialTitle)
+  const [category, setCategory] = useState(categories.includes(initialCategory) ? initialCategory : 'Инструкция')
   const [access, setAccess] = useState<DocAccess>('internal')
   const [content, setContent] = useState<any>(null)
   const [saving, setSaving] = useState(false)

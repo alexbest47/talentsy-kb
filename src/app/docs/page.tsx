@@ -37,6 +37,7 @@ const categories = [
   'Кейс',
   'Описание программы',
   'Описание аудитории',
+  'Вакансия',
 ]
 
 export default function DocsPage() {

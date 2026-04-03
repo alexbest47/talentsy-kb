@@ -18,6 +18,7 @@ const categories = [
   'Кейс',
   'Описание программы',
   'Описание аудитории',
+  'Вакансия',
 ]
 
 // Tiny component that shows save status without re-rendering the whole page
