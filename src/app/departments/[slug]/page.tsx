@@ -6,6 +6,45 @@ import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x
 import clsx from 'clsx'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRoleStore, type UserRole } from '@/lib/stores/role-store'
+
+const ROLE_PROFILES: Record<UserRole, string> = {
+  employee: 'Иван Иванов',
+  head: 'Елена Петрова',
+  admin: 'Алексей Сидоров',
+}
+
+function getMonthFromMetric(metric: string | null): number | null {
+  if (!metric) return null
+  const lower = metric.toLowerCase()
+  if (lower.includes('январ')) return 1
+  if (lower.includes('феврал')) return 2
+  if (lower.includes('март') || lower.includes('марта')) return 3
+  if (lower.includes('апрел')) return 4
+  if (lower.includes('мая') || lower.includes('май')) return 5
+  if (lower.includes('июн')) return 6
+  if (lower.includes('июл')) return 7
+  if (lower.includes('август')) return 8
+  if (lower.includes('сентябр')) return 9
+  if (lower.includes('октябр')) return 10
+  if (lower.includes('ноябр')) return 11
+  if (lower.includes('декабр')) return 12
+  return null
+}
+
+const MONTH_NAMES: Record<number, string> = {
+  1: 'Январь', 2: 'Февраль', 3: 'Март',
+  4: 'Апрель', 5: 'Май', 6: 'Июнь',
+  7: 'Июль', 8: 'Август', 9: 'Сентябрь',
+  10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
+}
+
+const QUARTER_MONTHS: Record<string, number[]> = {
+  'Q1': [1, 2, 3],
+  'Q2': [4, 5, 6],
+  'Q3': [7, 8, 9],
+  'Q4': [10, 11, 12],
+}
 
 interface DepartmentData {
   slug: string
@@ -443,14 +482,13 @@ function GoalDetailModal({
 }) {
   const [comments, setComments] = useState<GoalComment[]>([])
   const [newComment, setNewComment] = useState('')
-  const [authorName, setAuthorName] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { role } = useRoleStore()
+  const authorName = ROLE_PROFILES[role]
 
   useEffect(() => {
-    const stored = localStorage.getItem('talentsy_comment_author')
-    if (stored) setAuthorName(stored)
     fetchComments()
   }, [goal.id])
 
@@ -471,7 +509,6 @@ function GoalDetailModal({
     const text = newComment.trim()
     if (!name || !text) return
 
-    localStorage.setItem('talentsy_comment_author', name)
     setSending(true)
     const supabase = createClient()
     const { data, error } = await supabase
@@ -554,15 +591,6 @@ function GoalDetailModal({
 
         {/* Input */}
         <div className="px-5 py-3 border-t border-slate-200 flex-shrink-0 space-y-2">
-          {!authorName && (
-            <input
-              type="text"
-              placeholder="Ваше имя"
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-            />
-          )}
           <div className="flex gap-2">
             <textarea
               placeholder="Напишите комментарий..."
@@ -579,10 +607,10 @@ function GoalDetailModal({
             />
             <button
               onClick={handleSend}
-              disabled={sending || !newComment.trim() || !authorName.trim()}
+              disabled={sending || !newComment.trim()}
               className={clsx(
                 'self-end px-3 py-2 rounded-lg transition-colors flex-shrink-0',
-                sending || !newComment.trim() || !authorName.trim()
+                sending || !newComment.trim()
                   ? 'bg-slate-100 text-slate-300'
                   : 'bg-purple-600 text-white hover:bg-purple-700'
               )}
@@ -590,11 +618,7 @@ function GoalDetailModal({
               <Send size={16} />
             </button>
           </div>
-          {authorName && (
-            <p className="text-[10px] text-slate-300">
-              От имени: {authorName} · <button className="underline hover:text-slate-500" onClick={() => { setAuthorName(''); localStorage.removeItem('talentsy_comment_author') }}>сменить</button>
-            </p>
-          )}
+          <p className="text-[10px] text-slate-300">От имени: {authorName}</p>
         </div>
       </div>
     </div>
@@ -750,63 +774,100 @@ function GoalsTab({ slug }: { slug: string }) {
         </div>
       )}
 
-      {/* Goals grouped by position */}
-      {Object.entries(goalsByPosition).map(([posId, group]) => (
-        <div key={posId} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">{group.position_title}</h3>
-                <p className={clsx(
-                  'text-xs mt-0.5',
-                  group.position_holder ? 'text-slate-500' : 'text-orange-500 font-medium'
-                )}>
-                  {group.position_holder || 'ВАКАНСИЯ'}
-                </p>
+      {/* Goals grouped by position, then by month */}
+      {Object.entries(goalsByPosition).map(([posId, group]) => {
+        // Group goals by month
+        const quarterPrefix = selectedQuarter.split('-')[0] // 'Q2'
+        const months = QUARTER_MONTHS[quarterPrefix] || []
+        const goalsByMonth: Record<number | 'other', PositionGoal[]> = { other: [] }
+        months.forEach(m => { goalsByMonth[m] = [] })
+
+        group.goals.forEach(goal => {
+          const month = getMonthFromMetric(goal.metric)
+          if (month && goalsByMonth[month] !== undefined) {
+            goalsByMonth[month].push(goal)
+          } else {
+            goalsByMonth['other'].push(goal)
+          }
+        })
+
+        // Build ordered list: other first (as "Весь квартал"), then by month
+        const monthSections: { key: string; label: string; goals: PositionGoal[] }[] = []
+        if (goalsByMonth['other'].length > 0) {
+          monthSections.push({ key: 'other', label: 'Весь квартал', goals: goalsByMonth['other'] })
+        }
+        months.forEach(m => {
+          if (goalsByMonth[m] && goalsByMonth[m].length > 0) {
+            monthSections.push({ key: String(m), label: MONTH_NAMES[m], goals: goalsByMonth[m] })
+          }
+        })
+
+        return (
+          <div key={posId} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{group.position_title}</h3>
+                  <p className={clsx(
+                    'text-xs mt-0.5',
+                    group.position_holder ? 'text-slate-500' : 'text-orange-500 font-medium'
+                  )}>
+                    {group.position_holder || 'ВАКАНСИЯ'}
+                  </p>
+                </div>
+                <span className="text-xs text-slate-400 font-medium">
+                  {group.goals.length} {group.goals.length === 1 ? 'цель' : group.goals.length < 5 ? 'цели' : 'целей'}
+                </span>
               </div>
-              <span className="text-xs text-slate-400 font-medium">
-                {group.goals.length} {group.goals.length === 1 ? 'цель' : group.goals.length < 5 ? 'цели' : 'целей'}
-              </span>
+            </div>
+            <div>
+              {monthSections.map((section) => (
+                <div key={section.key}>
+                  <div className="px-5 py-2 bg-purple-50/50 border-y border-slate-100">
+                    <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">{section.label}</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {section.goals.map((goal) => (
+                      <button
+                        key={goal.id}
+                        onClick={() => setSelectedGoal(goal)}
+                        className="w-full px-5 py-3 flex items-start justify-between gap-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className={clsx(
+                            'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
+                            goal.status === 'completed' ? 'bg-green-100' : 'bg-purple-100'
+                          )}>
+                            {goal.status === 'completed' ? (
+                              <Check size={12} className="text-green-600" />
+                            ) : (
+                              <div className="w-2 h-2 rounded-full bg-purple-400" />
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-700">{goal.text}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {commentCounts[goal.id] > 0 && (
+                            <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                              <MessageCircle size={12} />
+                              {commentCounts[goal.id]}
+                            </span>
+                          )}
+                          {goal.metric && (
+                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded whitespace-nowrap">
+                              {goal.metric}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            {group.goals.map((goal) => (
-              <button
-                key={goal.id}
-                onClick={() => setSelectedGoal(goal)}
-                className="w-full px-5 py-3 flex items-start justify-between gap-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className={clsx(
-                    'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-                    goal.status === 'completed' ? 'bg-green-100' : 'bg-purple-100'
-                  )}>
-                    {goal.status === 'completed' ? (
-                      <Check size={12} className="text-green-600" />
-                    ) : (
-                      <div className="w-2 h-2 rounded-full bg-purple-400" />
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-700">{goal.text}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {commentCounts[goal.id] > 0 && (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
-                      <MessageCircle size={12} />
-                      {commentCounts[goal.id]}
-                    </span>
-                  )}
-                  {goal.metric && (
-                    <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded whitespace-nowrap">
-                      {goal.metric}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
+        )
+      })}
 
       {/* Goal detail modal with comments */}
       {selectedGoal && (
