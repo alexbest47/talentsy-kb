@@ -101,14 +101,35 @@ export default function DocPage() {
     }
   }
 
-  const handleToggleShare = (enabled: boolean) => {
-    setDoc((prev) => prev ? {
-      ...prev,
-      access: enabled ? 'external' : 'internal',
-      share_token: enabled
-        ? prev.share_token || 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-        : prev.share_token,
-    } : null)
+  const handleToggleShare = async (enabled: boolean) => {
+    if (!doc) return
+
+    const newAccess = enabled ? 'external' : 'internal'
+    const newToken = enabled
+      ? doc.share_token || 'tk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      : doc.share_token
+
+    // Optimistically update UI
+    setDoc((prev) => prev ? { ...prev, access: newAccess, share_token: newToken } : null)
+
+    // Persist to Supabase
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          access: newAccess,
+          share_token: newToken,
+          share_enabled: enabled,
+        })
+        .eq('id', doc.id)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating share settings:', error)
+      // Revert on error
+      setDoc((prev) => prev ? { ...prev, access: doc.access, share_token: doc.share_token } : null)
+    }
   }
 
   return (
