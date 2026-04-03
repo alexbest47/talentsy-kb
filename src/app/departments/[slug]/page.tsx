@@ -2,9 +2,9 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x3, FileText, Zap, Check, X, Eye } from 'lucide-react'
+import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x3, FileText, Zap, Check, X, Eye, MessageCircle, Send, Clock } from 'lucide-react'
 import clsx from 'clsx'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface DepartmentData {
@@ -60,6 +60,14 @@ interface PositionGoal {
   role: string | null
   position_title: string
   position_holder: string
+}
+
+interface GoalComment {
+  id: string
+  goal_id: string
+  author_name: string
+  text: string
+  created_at: string
 }
 
 interface Document {
@@ -426,10 +434,179 @@ function StructureTab({
   )
 }
 
+function GoalDetailModal({
+  goal,
+  onClose,
+}: {
+  goal: PositionGoal
+  onClose: () => void
+}) {
+  const [comments, setComments] = useState<GoalComment[]>([])
+  const [newComment, setNewComment] = useState('')
+  const [authorName, setAuthorName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('talentsy_comment_author')
+    if (stored) setAuthorName(stored)
+    fetchComments()
+  }, [goal.id])
+
+  const fetchComments = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('goal_comments')
+      .select('*')
+      .eq('goal_id', goal.id)
+      .order('created_at', { ascending: true })
+    setComments(data || [])
+    setLoading(false)
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100)
+  }
+
+  const handleSend = async () => {
+    const name = authorName.trim()
+    const text = newComment.trim()
+    if (!name || !text) return
+
+    localStorage.setItem('talentsy_comment_author', name)
+    setSending(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('goal_comments')
+      .insert({ goal_id: goal.id, author_name: name, text })
+      .select()
+      .single()
+
+    if (!error && data) {
+      setComments((prev) => [...prev, data])
+      setNewComment('')
+      setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100)
+    }
+    setSending(false)
+  }
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const day = d.getDate().toString().padStart(2, '0')
+    const month = (d.getMonth() + 1).toString().padStart(2, '0')
+    const hours = d.getHours().toString().padStart(2, '0')
+    const mins = d.getMinutes().toString().padStart(2, '0')
+    return `${day}.${month} ${hours}:${mins}`
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 flex-shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-900 leading-snug">{goal.text}</p>
+              {goal.metric && (
+                <span className="inline-block mt-2 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                  {goal.metric}
+                </span>
+              )}
+              <p className="text-xs text-slate-400 mt-1">{goal.position_title} — {goal.position_holder || 'ВАКАНСИЯ'}</p>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 flex-shrink-0 mt-0.5">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Comments list */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-[200px]">
+          {loading ? (
+            <p className="text-center text-sm text-slate-400 py-8">Загрузка...</p>
+          ) : comments.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageCircle size={32} className="text-slate-200 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">Комментариев пока нет</p>
+              <p className="text-xs text-slate-300 mt-1">Напишите первый комментарий</p>
+            </div>
+          ) : (
+            comments.map((c) => (
+              <div key={c.id} className="group">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-xs font-bold text-purple-600">
+                    {c.author_name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700">{c.author_name}</span>
+                  <span className="text-[10px] text-slate-300 flex items-center gap-0.5">
+                    <Clock size={10} />
+                    {formatDate(c.created_at)}
+                  </span>
+                </div>
+                <div className="ml-8 bg-slate-50 rounded-lg px-3 py-2">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{c.text}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="px-5 py-3 border-t border-slate-200 flex-shrink-0 space-y-2">
+          {!authorName && (
+            <input
+              type="text"
+              placeholder="Ваше имя"
+              value={authorName}
+              onChange={(e) => setAuthorName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+            />
+          )}
+          <div className="flex gap-2">
+            <textarea
+              placeholder="Напишите комментарий..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              rows={2}
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none"
+            />
+            <button
+              onClick={handleSend}
+              disabled={sending || !newComment.trim() || !authorName.trim()}
+              className={clsx(
+                'self-end px-3 py-2 rounded-lg transition-colors flex-shrink-0',
+                sending || !newComment.trim() || !authorName.trim()
+                  ? 'bg-slate-100 text-slate-300'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              )}
+            >
+              <Send size={16} />
+            </button>
+          </div>
+          {authorName && (
+            <p className="text-[10px] text-slate-300">
+              От имени: {authorName} · <button className="underline hover:text-slate-500" onClick={() => { setAuthorName(''); localStorage.removeItem('talentsy_comment_author') }}>сменить</button>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GoalsTab({ slug }: { slug: string }) {
   const [goals, setGoals] = useState<PositionGoal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedQuarter, setSelectedQuarter] = useState('Q2-2026')
+  const [selectedGoal, setSelectedGoal] = useState<PositionGoal | null>(null)
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const fetchGoals = async () => {
@@ -490,6 +667,22 @@ function GoalsTab({ slug }: { slug: string }) {
         }))
 
         setGoals(enriched)
+
+        // 5. Fetch comment counts for all goals
+        const goalIds = goalsData.map((g: any) => g.id)
+        if (goalIds.length > 0) {
+          const { data: commentsData } = await supabase
+            .from('goal_comments')
+            .select('goal_id')
+            .in('goal_id', goalIds)
+          if (commentsData) {
+            const counts: Record<string, number> = {}
+            commentsData.forEach((c: any) => {
+              counts[c.goal_id] = (counts[c.goal_id] || 0) + 1
+            })
+            setCommentCounts(counts)
+          }
+        }
       }
       setLoading(false)
     }
@@ -578,7 +771,11 @@ function GoalsTab({ slug }: { slug: string }) {
           </div>
           <div className="divide-y divide-slate-100">
             {group.goals.map((goal) => (
-              <div key={goal.id} className="px-5 py-3 flex items-start justify-between gap-4">
+              <button
+                key={goal.id}
+                onClick={() => setSelectedGoal(goal)}
+                className="w-full px-5 py-3 flex items-start justify-between gap-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+              >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <div className={clsx(
                     'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
@@ -592,16 +789,49 @@ function GoalsTab({ slug }: { slug: string }) {
                   </div>
                   <p className="text-sm text-slate-700">{goal.text}</p>
                 </div>
-                {goal.metric && (
-                  <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded flex-shrink-0 whitespace-nowrap">
-                    {goal.metric}
-                  </span>
-                )}
-              </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {commentCounts[goal.id] > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                      <MessageCircle size={12} />
+                      {commentCounts[goal.id]}
+                    </span>
+                  )}
+                  {goal.metric && (
+                    <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded whitespace-nowrap">
+                      {goal.metric}
+                    </span>
+                  )}
+                </div>
+              </button>
             ))}
           </div>
         </div>
       ))}
+
+      {/* Goal detail modal with comments */}
+      {selectedGoal && (
+        <GoalDetailModal
+          goal={selectedGoal}
+          onClose={() => {
+            setSelectedGoal(null)
+            // Refresh comment counts
+            const fetchCounts = async () => {
+              const supabase = createClient()
+              const goalIds = goals.map(g => g.id)
+              const { data } = await supabase
+                .from('goal_comments')
+                .select('goal_id')
+                .in('goal_id', goalIds)
+              if (data) {
+                const counts: Record<string, number> = {}
+                data.forEach((c: any) => { counts[c.goal_id] = (counts[c.goal_id] || 0) + 1 })
+                setCommentCounts(counts)
+              }
+            }
+            fetchCounts()
+          }}
+        />
+      )}
     </div>
   )
 }
