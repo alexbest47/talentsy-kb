@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   AlertCircle,
@@ -13,6 +14,11 @@ import {
   FileText,
   ChevronDown,
   ExternalLink,
+  Plus,
+  Search,
+  X,
+  Link2,
+  Unlink,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
@@ -27,8 +33,16 @@ interface Vacancy {
   priority: Priority
   teamSize: number
   vacancyDocId: string | null
+  vacancyDocTitle: string | null
   level: string
   subordinates: string[]
+}
+
+interface DocOption {
+  id: string
+  title: string
+  category: string | null
+  updated_at: string | null
 }
 
 const priorityConfig: Record<Priority, { label: string; bg: string; text: string; border: string; icon: React.ReactNode; dot: string }> = {
@@ -68,11 +82,171 @@ const priorityConfig: Record<Priority, { label: string; bg: string; text: string
 
 const priorityOrder: Priority[] = ['critical', 'high', 'medium', 'low']
 
+/* ─── Document Picker Modal ─── */
+function DocPickerModal({
+  vacancy,
+  onClose,
+  onSelect,
+  onUnlink,
+}: {
+  vacancy: Vacancy
+  onClose: () => void
+  onSelect: (docId: string, docTitle: string) => void
+  onUnlink: () => void
+}) {
+  const router = useRouter()
+  const [docs, setDocs] = useState<DocOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('documents')
+          .select('id, title, category, updated_at')
+          .eq('status', 'published')
+          .order('updated_at', { ascending: false })
+
+        if (error) throw error
+        setDocs(data || [])
+      } catch (err) {
+        console.error('Error fetching documents:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDocs()
+    setTimeout(() => searchRef.current?.focus(), 100)
+  }, [])
+
+  const filtered = search.trim()
+    ? docs.filter((d) => d.title.toLowerCase().includes(search.toLowerCase()))
+    : docs
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Документ для вакансии</h3>
+            <p className="text-xs text-slate-500 mt-0.5">{vacancy.position}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+            <X size={18} className="text-slate-400" />
+          </button>
+        </div>
+
+        {/* Actions row */}
+        <div className="px-5 py-3 border-b border-slate-100 flex gap-2">
+          <button
+            onClick={() => {
+              router.push(
+                `/docs/new?title=${encodeURIComponent('Вакансия: ' + vacancy.position)}&category=${encodeURIComponent('Описание вакансии')}&linkPositionId=${vacancy.id}`
+              )
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <Plus size={15} />
+            Создать новый документ
+          </button>
+          {vacancy.vacancyDocId && (
+            <button
+              onClick={() => {
+                onUnlink()
+                onClose()
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-sm text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Unlink size={14} />
+              Отвязать
+            </button>
+          )}
+        </div>
+
+        {/* Search */}
+        <div className="px-5 py-3 border-b border-slate-100">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по документам..."
+              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Documents list */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {loading ? (
+            <div className="text-center py-8 text-sm text-slate-500">Загрузка документов...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8 text-sm text-slate-500">
+              {search ? 'Документы не найдены' : 'Нет опубликованных документов'}
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {filtered.map((doc) => {
+                const isLinked = doc.id === vacancy.vacancyDocId
+                return (
+                  <button
+                    key={doc.id}
+                    onClick={() => {
+                      onSelect(doc.id, doc.title)
+                      onClose()
+                    }}
+                    className={clsx(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
+                      isLinked
+                        ? 'bg-purple-50 border border-purple-200'
+                        : 'hover:bg-slate-50'
+                    )}
+                  >
+                    <FileText
+                      size={16}
+                      className={isLinked ? 'text-purple-600 flex-shrink-0' : 'text-slate-400 flex-shrink-0'}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className={clsx('text-sm truncate', isLinked ? 'font-medium text-purple-700' : 'text-slate-700')}>
+                        {doc.title}
+                      </p>
+                      {doc.category && (
+                        <p className="text-xs text-slate-400 mt-0.5">{doc.category}</p>
+                      )}
+                    </div>
+                    {isLinked && (
+                      <span className="flex items-center gap-1 text-xs text-purple-600 flex-shrink-0">
+                        <Link2 size={12} />
+                        Привязан
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Main Page ─── */
 export default function VacanciesPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [savingPriority, setSavingPriority] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [docPickerFor, setDocPickerFor] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchVacancies = async () => {
@@ -86,6 +260,23 @@ export default function VacanciesPage() {
 
         if (error) throw error
 
+        // Fetch document titles for linked vacancies
+        const docIds = (data || [])
+          .map((p) => p.vacancy_doc_id)
+          .filter(Boolean) as string[]
+
+        let docTitles: Record<string, string> = {}
+        if (docIds.length > 0) {
+          const { data: docs } = await supabase
+            .from('documents')
+            .select('id, title')
+            .in('id', docIds)
+
+          if (docs) {
+            docTitles = Object.fromEntries(docs.map((d) => [d.id, d.title]))
+          }
+        }
+
         const transformedVacancies: Vacancy[] = (data || []).map((pos) => ({
           id: pos.id?.toString() || pos.title,
           position: pos.title,
@@ -94,6 +285,7 @@ export default function VacanciesPage() {
           priority: (pos.priority as Priority) || (pos.level === 'ceo-1' || pos.level === 'ceo-2' ? 'critical' : 'high'),
           teamSize: pos.subordinates?.length || 0,
           vacancyDocId: pos.vacancy_doc_id || null,
+          vacancyDocTitle: pos.vacancy_doc_id ? (docTitles[pos.vacancy_doc_id] || 'Документ') : null,
           level: pos.level || 'ceo-3',
           subordinates: pos.subordinates || [],
         }))
@@ -144,6 +336,46 @@ export default function VacanciesPage() {
     }
   }
 
+  const handleDocSelect = async (vacancyId: string, docId: string, docTitle: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('positions')
+        .update({ vacancy_doc_id: docId })
+        .eq('id', vacancyId)
+
+      if (error) throw error
+
+      setVacancies((prev) =>
+        prev.map((v) =>
+          v.id === vacancyId ? { ...v, vacancyDocId: docId, vacancyDocTitle: docTitle } : v
+        )
+      )
+    } catch (error) {
+      console.error('Error linking document:', error)
+    }
+  }
+
+  const handleDocUnlink = async (vacancyId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('positions')
+        .update({ vacancy_doc_id: null })
+        .eq('id', vacancyId)
+
+      if (error) throw error
+
+      setVacancies((prev) =>
+        prev.map((v) =>
+          v.id === vacancyId ? { ...v, vacancyDocId: null, vacancyDocTitle: null } : v
+        )
+      )
+    } catch (error) {
+      console.error('Error unlinking document:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto">
@@ -158,6 +390,7 @@ export default function VacanciesPage() {
   const highCount = vacancies.filter((v) => v.priority === 'high').length
   const mediumCount = vacancies.filter((v) => v.priority === 'medium').length
   const lowCount = vacancies.filter((v) => v.priority === 'low').length
+  const pickerVacancy = docPickerFor ? vacancies.find((v) => v.id === docPickerFor) : null
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -287,29 +520,38 @@ export default function VacanciesPage() {
                 </div>
               </div>
 
-              {/* Document link or placeholder */}
-              <div className="mb-3">
+              {/* Document link or add button */}
+              <div className="mb-3 flex items-center gap-2">
                 {vacancy.vacancyDocId ? (
-                  <Link
-                    href={`/docs/${vacancy.vacancyDocId}`}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors group"
-                  >
-                    <FileText size={16} className="text-purple-600" />
-                    <span className="text-sm font-medium text-purple-700">
-                      Описание вакансии
-                    </span>
-                    <ExternalLink size={13} className="text-purple-400 group-hover:text-purple-600 transition-colors" />
-                  </Link>
+                  <>
+                    <Link
+                      href={`/docs/${vacancy.vacancyDocId}`}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors group"
+                    >
+                      <FileText size={16} className="text-purple-600" />
+                      <span className="text-sm font-medium text-purple-700">
+                        {vacancy.vacancyDocTitle || 'Описание вакансии'}
+                      </span>
+                      <ExternalLink size={13} className="text-purple-400 group-hover:text-purple-600 transition-colors" />
+                    </Link>
+                    <button
+                      onClick={() => setDocPickerFor(vacancy.id)}
+                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      title="Сменить документ"
+                    >
+                      <Link2 size={15} />
+                    </button>
+                  </>
                 ) : (
-                  <Link
-                    href={`/docs/new?title=${encodeURIComponent('Вакансия: ' + vacancy.position)}&category=${encodeURIComponent('Описание вакансии')}`}
+                  <button
+                    onClick={() => setDocPickerFor(vacancy.id)}
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 border-dashed rounded-lg hover:bg-slate-100 transition-colors group"
                   >
                     <FileText size={16} className="text-slate-400" />
                     <span className="text-sm text-slate-500 group-hover:text-slate-700">
                       + Добавить описание вакансии
                     </span>
-                  </Link>
+                  </button>
                 )}
               </div>
 
@@ -344,6 +586,16 @@ export default function VacanciesPage() {
           </div>
         </div>
       </div>
+
+      {/* Document Picker Modal */}
+      {pickerVacancy && (
+        <DocPickerModal
+          vacancy={pickerVacancy}
+          onClose={() => setDocPickerFor(null)}
+          onSelect={(docId, docTitle) => handleDocSelect(pickerVacancy.id, docId, docTitle)}
+          onUnlink={() => handleDocUnlink(pickerVacancy.id)}
+        />
+      )}
     </div>
   )
 }
