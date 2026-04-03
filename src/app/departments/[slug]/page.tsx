@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x3, FileText, Zap, Check, X, Eye, MessageCircle, Send, Clock } from 'lucide-react'
+import { ArrowLeft, Users, UserX, User, Plus, Edit, Trash2, ExternalLink, Grid3x3, FileText, Zap, Check, X, Eye, MessageCircle, Send, Clock, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -127,6 +127,155 @@ interface DepartmentLink {
   created_at: string
 }
 
+/* ─── Position Picker Component ─── */
+function PositionPicker({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (val: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [roles, setRoles] = useState<string[]>([])
+  const [search, setSearch] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [newRole, setNewRole] = useState('')
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('org_employees')
+        .select('role')
+      if (data) {
+        const unique = [...new Set(data.map((d) => d.role).filter(Boolean))] as string[]
+        unique.sort((a, b) => a.localeCompare(b, 'ru'))
+        setRoles(unique)
+      }
+    }
+    fetchRoles()
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setAdding(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filtered = search.trim()
+    ? roles.filter((r) => r.toLowerCase().includes(search.toLowerCase()))
+    : roles
+
+  const handleAddNew = () => {
+    if (newRole.trim()) {
+      onChange(newRole.trim())
+      setRoles((prev) => [...prev, newRole.trim()].sort((a, b) => a.localeCompare(b, 'ru')))
+      setNewRole('')
+      setAdding(false)
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div
+        onClick={() => setOpen(!open)}
+        className="w-full text-sm px-2 py-1 border border-slate-300 rounded cursor-pointer flex items-center justify-between bg-white"
+      >
+        <span className={value ? 'text-slate-900' : 'text-slate-400'}>
+          {value || 'Должность'}
+        </span>
+        <ChevronDown size={14} className={clsx('text-slate-400 transition-transform', open && 'rotate-180')} />
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-[240px] flex flex-col">
+          {/* Search */}
+          <div className="p-2 border-b border-slate-100">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск должности..."
+              className="w-full text-sm px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Options */}
+          <div className="overflow-y-auto flex-1">
+            {filtered.map((role) => (
+              <button
+                key={role}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChange(role)
+                  setOpen(false)
+                  setSearch('')
+                }}
+                className={clsx(
+                  'w-full text-left px-3 py-1.5 text-sm hover:bg-purple-50 transition-colors',
+                  value === role && 'bg-purple-50 text-purple-700 font-medium'
+                )}
+              >
+                {role}
+              </button>
+            ))}
+            {filtered.length === 0 && !adding && (
+              <div className="px-3 py-2 text-xs text-slate-400">Ничего не найдено</div>
+            )}
+          </div>
+
+          {/* Add new */}
+          <div className="border-t border-slate-100 p-2">
+            {adding ? (
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  placeholder="Новая должность..."
+                  className="flex-1 text-sm px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddNew()}
+                />
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddNew() }}
+                  className="p-1 text-green-600 hover:bg-green-50 rounded"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAdding(false); setNewRole('') }}
+                  className="p-1 text-slate-400 hover:bg-slate-50 rounded"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setAdding(true) }}
+                className="w-full flex items-center gap-1.5 px-2 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
+              >
+                <Plus size={14} />
+                Создать новую должность
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function EmployeeRow({
   employee,
   onEdit,
@@ -157,13 +306,7 @@ function EmployeeRow({
             placeholder="Имя сотрудника"
             className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
           />
-          <input
-            type="text"
-            value={editRole}
-            onChange={(e) => setEditRole(e.target.value)}
-            placeholder="Должность"
-            className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
-          />
+          <PositionPicker value={editRole} onChange={setEditRole} />
           <input
             type="text"
             value={editNote}
@@ -319,13 +462,7 @@ function StructureTab({
                     className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
                     autoFocus
                   />
-                  <input
-                    type="text"
-                    value={addRole}
-                    onChange={(e) => setAddRole(e.target.value)}
-                    placeholder="Должность"
-                    className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
-                  />
+                  <PositionPicker value={addRole} onChange={setAddRole} />
                   <input
                     type="text"
                     value={addNote}
@@ -415,13 +552,7 @@ function StructureTab({
                         className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
                         autoFocus
                       />
-                      <input
-                        type="text"
-                        value={addRole}
-                        onChange={(e) => setAddRole(e.target.value)}
-                        placeholder="Должность"
-                        className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
-                      />
+                      <PositionPicker value={addRole} onChange={setAddRole} />
                       <input
                         type="text"
                         value={addNote}
