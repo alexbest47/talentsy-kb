@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import {
   Building2,
   Package,
@@ -18,6 +19,7 @@ import {
   UserCog,
   User,
   GraduationCap,
+  CalendarClock,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useRoleStore, ROLE_LABELS, ROLE_COLORS, type UserRole } from '@/lib/stores/role-store'
@@ -57,7 +59,45 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [roleSelectorOpen, setRoleSelectorOpen] = useState(false)
 
-  const profile = PROFILES[role]
+  const fallbackProfile = PROFILES[role]
+  const router = useRouter()
+  const [authProfile, setAuthProfile] = useState<{ full_name: string; position: string; email: string } | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    let mounted = true
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !mounted) return
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name, position, role, email')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (!mounted) return
+      const meta: any = user.user_metadata || {}
+      setAuthProfile({
+        full_name: prof?.full_name || meta.full_name || user.email || 'Пользователь',
+        position: prof?.position || (prof?.role === 'admin' ? 'Администратор' : meta.role || ''),
+        email: user.email || '',
+      })
+      if (prof?.role && (prof.role === 'admin' || prof.role === 'head' || prof.role === 'employee')) {
+        setRole(prof.role as UserRole)
+      }
+    }
+    load()
+    const { data: sub } = supabase.auth.onAuthStateChange(() => load())
+    return () => { mounted = false; sub.subscription.unsubscribe() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const profile = authProfile || fallbackProfile
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   const canSee = (minRole?: UserRole) => {
     if (!minRole) return true
@@ -88,7 +128,7 @@ export default function Sidebar() {
     },
     {
       id: 'onboarding',
-      label: 'Онбординг',
+      label: 'Welcome тренинг',
       icon: <GraduationCap size={20} />,
       href: '/onboarding',
     },
@@ -116,6 +156,21 @@ export default function Sidebar() {
         { label: 'Финансы', href: '/departments/finance' },
         { label: 'Администрация', href: '/departments/admin' },
         { label: 'HR', href: '/departments/hr' },
+      ],
+    },
+    {
+      id: 'meetings',
+      label: 'Планерки',
+      icon: <CalendarClock size={20} />,
+      items: [
+        { label: 'DreamTeam', href: '/meetings/dreamteam' },
+        { label: 'Продажи', href: '/meetings/sales' },
+        { label: 'Маркетинг', href: '/meetings/marketing' },
+        { label: 'Продукт', href: '/meetings/product' },
+        { label: 'Технический', href: '/meetings/tech' },
+        { label: 'Финансы', href: '/meetings/finance' },
+        { label: 'Администрация', href: '/meetings/admin' },
+        { label: 'HR', href: '/meetings/hr' },
       ],
     },
     {
@@ -152,7 +207,7 @@ export default function Sidebar() {
           <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-lg">T</span>
           </div>
-          <span className="text-xl font-bold text-white">Talentsy KB</span>
+          <span className="text-xl font-bold text-white">Talentsy WorkSpace</span>
         </Link>
       </div>
 
@@ -303,7 +358,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
           <LogOut size={16} />
           <span>Выход</span>
         </button>

@@ -1339,6 +1339,47 @@ export default function DepartmentPage() {
         .eq('department_slug', slug)
         .order('sort_order', { ascending: true })
 
+      // Derive director + reports_to from org_tree (source of truth)
+      try {
+        const { data: treeRow } = await supabase
+          .from('org_tree')
+          .select('data')
+          .limit(1)
+          .maybeSingle()
+        const root = (treeRow as any)?.data
+        if (root) {
+          const norm = (s: string) => (s || '').toLowerCase().replace(/ё/g, 'е').trim()
+          const target = norm(deptData.name)
+          let foundNode: any = null
+          let parentNode: any = null
+          const walk = (node: any, parent: any) => {
+            if (!node) return
+            if (!foundNode && norm(node.name) === target) {
+              foundNode = node
+              parentNode = parent
+              return
+            }
+            ;(node.children || []).forEach((c: any) => walk(c, node))
+          }
+          walk(root, null)
+          if (foundNode) {
+            const dirName = (foundNode.name || '').trim()
+            const isVacancy = !dirName || /вакансия/i.test(dirName)
+            ;(deptData as any).director_name = isVacancy ? '' : dirName
+            ;(deptData as any).director_is_vacancy = isVacancy
+            ;(deptData as any).director_position = foundNode.position || (deptData as any).director_position
+            if (parentNode) {
+              const pName = (parentNode.name || '').trim()
+              const pPos = parentNode.position || ''
+              const pIsVacancy = !pName || /вакансия/i.test(pName)
+              ;(deptData as any).reports_to = pIsVacancy
+                ? `${pPos || 'Руководитель'} (вакансия)`
+                : `${pName}${pPos ? ` (${pPos})` : ''}`
+            }
+          }
+        }
+      } catch {}
+
       setDept(deptData)
       if (!unitsError && unitsData) {
         setUnits(unitsData)

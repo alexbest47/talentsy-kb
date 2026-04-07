@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Tag,
   Target,
+  GraduationCap,
 } from 'lucide-react'
 
 interface AdminCard {
@@ -37,6 +38,14 @@ const adminCards: AdminCard[] = [
     icon: <Target size={32} />,
     href: '/admin/goals',
     stats: 'Квартальные OKR и KPI',
+  },
+  {
+    id: 'welcome-training',
+    title: 'Welcome тренинг',
+    description: 'Редактирование этапов, описаний, материалов и видео',
+    icon: <GraduationCap size={32} />,
+    href: '/admin/welcome-training',
+    stats: 'Программа адаптации новых сотрудников',
   },
   {
     id: 'users',

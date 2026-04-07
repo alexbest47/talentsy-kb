@@ -17,6 +17,10 @@ interface Goal {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  position_id: string | null;
+  position_title?: string;
+  position_holder?: string;
+  group_key?: string;
 }
 
 interface EditingGoal {
@@ -149,7 +153,34 @@ export default function GoalsPage() {
 
         if (fetchError) throw fetchError;
 
-        setGoals(data || []);
+        // Enrich with positions (title + holder), like departments page
+        const posIds = Array.from(
+          new Set((data || []).map((g: any) => g.position_id).filter(Boolean))
+        );
+        let posMap: Record<string, { title: string; holder: string }> = {};
+        if (posIds.length > 0) {
+          const { data: positions } = await supabase
+            .from('positions')
+            .select('id,title,holder')
+            .in('id', posIds);
+          posMap = (positions || []).reduce((acc: any, p: any) => {
+            acc[p.id] = { title: p.title, holder: p.holder || '' };
+            return acc;
+          }, {});
+        }
+        const enriched: Goal[] = (data || []).map((g: any) => {
+          const fromPos = g.position_id ? posMap[g.position_id] : null;
+          const position_title = fromPos?.title || g.department || 'Без роли';
+          const position_holder = fromPos?.holder || g.role || '';
+          return {
+            ...g,
+            position_title,
+            position_holder,
+            group_key: g.position_id || `legacy:${g.department}`,
+          };
+        });
+
+        setGoals(enriched);
 
         const uniqueQuarters = Array.from(
           new Set((data || []).map(g => g.quarter))
@@ -178,14 +209,21 @@ export default function GoalsPage() {
   const groupedGoals = goals
     .filter(g => g.quarter === selectedQuarter)
     .reduce((acc, goal) => {
-      if (!acc[goal.department]) {
-        acc[goal.department] = [];
+      const key = goal.group_key || goal.department;
+      if (!acc[key]) {
+        acc[key] = {
+          title: goal.position_title || goal.department,
+          holder: goal.position_holder || '',
+          goals: [],
+        };
       }
-      acc[goal.department].push(goal);
+      acc[key].goals.push(goal);
       return acc;
-    }, {} as Record<string, Goal[]>);
+    }, {} as Record<string, { title: string; holder: string; goals: Goal[] }>);
 
-  const departmentsSorted = Object.keys(groupedGoals).sort();
+  const groupKeysSorted = Object.keys(groupedGoals).sort((a, b) =>
+    groupedGoals[a].title.localeCompare(groupedGoals[b].title, 'ru')
+  );
 
   const handleAddGoal = async () => {
     if (!newGoal.department.trim() || !newGoal.text.trim()) {
@@ -387,16 +425,24 @@ export default function GoalsPage() {
         </div>
 
         {/* Goals by department */}
-        {departmentsSorted.length > 0 ? (
+        {groupKeysSorted.length > 0 ? (
           <div className="space-y-6 mb-8">
-            {departmentsSorted.map(department => (
-              <div key={department} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            {groupKeysSorted.map(key => {
+              const group = groupedGoals[key];
+              return (
+              <div key={key} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="bg-gradient-to-r from-purple-50 to-slate-50 px-6 py-4 border-b border-slate-200">
-                  <h2 className="text-lg font-bold text-slate-900">{department}</h2>
+                  <h2 className="text-lg font-bold text-slate-900">{group.title}</h2>
+                  <p className={clsx(
+                    'text-xs mt-0.5',
+                    group.holder ? 'text-slate-500' : 'text-orange-500 font-semibold uppercase tracking-wider'
+                  )}>
+                    {group.holder || 'Вакансия'}
+                  </p>
                 </div>
 
                 <div className="divide-y divide-slate-200">
-                  {groupedGoals[department]?.map(goal => (
+                  {group.goals.map(goal => (
                     <div
                       key={goal.id}
                       className={clsx(
@@ -484,7 +530,8 @@ export default function GoalsPage() {
                   ))}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-lg p-12 text-center mb-8">

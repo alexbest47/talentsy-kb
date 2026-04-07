@@ -1,251 +1,439 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Search, ChevronUp, ChevronDown, MoreVertical, Trash2, Edit } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Search, Trash2, X, Users as UsersIcon, Mail, Upload } from 'lucide-react'
 
 interface User {
   id: string
-  name: string
   email: string
-  role: 'admin' | 'manager' | 'user'
-  status: 'active' | 'inactive'
-  joinedAt: string
-  lastActive: string
+  full_name: string
+  role: string
+  created_at: string
+  last_sign_in_at: string | null
+  confirmed: boolean
 }
 
-const users: User[] = [
-  {
-    id: 'user1',
-    name: 'Иван Иванов',
-    email: 'ivan.ivanov@talentsy.ru',
-    role: 'admin',
-    status: 'active',
-    joinedAt: '2023-01-15',
-    lastActive: '2024-03-25 14:30',
-  },
-  {
-    id: 'user2',
-    name: 'Наталья Федорова',
-    email: 'natalia.fedorova@talentsy.ru',
-    role: 'admin',
-    status: 'active',
-    joinedAt: '2023-02-20',
-    lastActive: '2024-03-25 13:45',
-  },
-  {
-    id: 'user3',
-    name: 'Виктор Петров',
-    email: 'viktor.petrov@talentsy.ru',
-    role: 'manager',
-    status: 'active',
-    joinedAt: '2023-03-10',
-    lastActive: '2024-03-24 16:20',
-  },
-  {
-    id: 'user4',
-    name: 'Анна Волконская',
-    email: 'anna.volkonskaya@talentsy.ru',
-    role: 'user',
-    status: 'active',
-    joinedAt: '2023-04-05',
-    lastActive: '2024-03-25 09:15',
-  },
-  {
-    id: 'user5',
-    name: 'Сергей Морозов',
-    email: 'sergey.morozov@talentsy.ru',
-    role: 'manager',
-    status: 'active',
-    joinedAt: '2023-05-12',
-    lastActive: '2024-03-23 11:00',
-  },
-  {
-    id: 'user6',
-    name: 'Павел Иванов',
-    email: 'pavel.ivanov@talentsy.ru',
-    role: 'user',
-    status: 'inactive',
-    joinedAt: '2023-06-08',
-    lastActive: '2024-02-15 10:30',
-  },
-]
-
-const roleColors = {
-  admin: { bg: 'bg-red-100', text: 'text-red-700' },
-  manager: { bg: 'bg-blue-100', text: 'text-blue-700' },
-  user: { bg: 'bg-gray-100', text: 'text-gray-700' },
-}
-
-const roleLabels = {
+const ROLE_LABELS: Record<string, string> = {
   admin: 'Администратор',
   manager: 'Менеджер',
   user: 'Пользователь',
 }
 
-const statusColors = {
-  active: { bg: 'bg-green-100', text: 'text-green-700', label: 'Активен' },
-  inactive: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Неактивен' },
+const ROLE_COLORS: Record<string, string> = {
+  admin: 'bg-red-100 text-red-700',
+  manager: 'bg-blue-100 text-blue-700',
+  user: 'bg-slate-100 text-slate-700',
 }
 
 export default function UsersPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('name')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [singleOpen, setSingleOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    let aVal = a[sortBy as keyof User]
-    let bVal = b[sortBy as keyof User]
-
-    if (typeof aVal === 'string') {
-      return sortOrder === 'asc'
-        ? aVal.localeCompare(bVal as string)
-        : (bVal as string).localeCompare(aVal)
-    }
-
-    return 0
-  })
-
-  const toggleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(field)
-      setSortOrder('asc')
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const r = await fetch('/api/admin/users')
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error || 'Ошибка загрузки')
+      setUsers(j.users || [])
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
     }
   }
 
+  useEffect(() => {
+    load()
+  }, [])
+
+  const removeUser = async (id: string, email: string) => {
+    if (!confirm(`Удалить пользователя ${email}?`)) return
+    const r = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' })
+    const j = await r.json()
+    if (!r.ok) {
+      alert(j.error)
+      return
+    }
+    setUsers((u) => u.filter((x) => x.id !== id))
+  }
+
+  const filtered = users.filter(
+    (u) =>
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.full_name || '').toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-4xl font-bold text-slate-900 mb-2">
             Управление пользователями
           </h1>
-          <p className="text-lg text-slate-600">
-            {users.length} всего пользователей, {users.filter((u) => u.status === 'active').length} активных
+          <p className="text-slate-600">
+            {users.length} всего пользователей
           </p>
         </div>
-        <button className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-          <Plus size={20} />
-          Добавить пользователя
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Поиск по имени или email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-lg placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
+        <div className="flex gap-2">
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="flex items-center gap-2 bg-white border border-slate-200 hover:border-purple-300 text-slate-700 px-4 py-2.5 rounded-lg font-medium transition-colors"
+          >
+            <Upload size={16} />
+            Массовая загрузка
+          </button>
+          <button
+            onClick={() => setSingleOpen(true)}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Добавить пользователя
+          </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 text-left">
-                <button
-                  onClick={() => toggleSort('name')}
-                  className="flex items-center gap-2 font-semibold text-slate-900 hover:text-purple-600"
-                >
-                  Пользователь
-                  {sortBy === 'name' && (
-                    sortOrder === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
-                  )}
-                </button>
-              </th>
-              <th className="px-6 py-4 text-left font-semibold text-slate-900">Email</th>
-              <th className="px-6 py-4 text-left">
-                <button
-                  onClick={() => toggleSort('role')}
-                  className="flex items-center gap-2 font-semibold text-slate-900 hover:text-purple-600"
-                >
-                  Роль
-                  {sortBy === 'role' && (
-                    sortOrder === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
-                  )}
-                </button>
-              </th>
-              <th className="px-6 py-4 text-left font-semibold text-slate-900">Статус</th>
-              <th className="px-6 py-4 text-left font-semibold text-slate-900">Присоединился</th>
-              <th className="px-6 py-4 text-left font-semibold text-slate-900">Последняя активность</th>
-              <th className="px-6 py-4 text-center font-semibold text-slate-900">Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedUsers.map((user, idx) => (
-              <tr
-                key={user.id}
-                className="border-t border-slate-200 hover:bg-slate-50 transition-colors"
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`}
-                      alt={user.name}
-                      className="w-8 h-8 rounded-full"
-                    />
-                    <p className="font-medium text-slate-900">{user.name}</p>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-slate-600 text-sm">{user.email}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${roleColors[user.role].bg} ${roleColors[user.role].text}`}>
-                    {roleLabels[user.role]}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[user.status].bg} ${statusColors[user.status].text}`}>
-                    {statusColors[user.status].label}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-slate-600 text-sm">
-                  {new Date(user.joinedAt).toLocaleDateString('ru-RU')}
-                </td>
-                <td className="px-6 py-4 text-slate-600 text-sm">
-                  {user.lastActive}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <button className="p-2 hover:bg-slate-200 rounded transition-colors">
-                      <Edit size={16} className="text-slate-600" />
-                    </button>
-                    <button className="p-2 hover:bg-red-100 rounded transition-colors">
-                      <Trash2 size={16} className="text-red-600" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="mb-6 relative">
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по имени или email..."
+          className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
       </div>
 
-      {/* Pagination */}
-      <div className="mt-6 flex items-center justify-between">
-        <p className="text-sm text-slate-600">
-          Показано {sortedUsers.length} из {users.length} пользователей
-        </p>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors">
-            Предыдущая
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        {loading ? (
+          <p className="p-8 text-center text-slate-500">Загрузка...</p>
+        ) : filtered.length === 0 ? (
+          <div className="p-12 text-center">
+            <UsersIcon size={32} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-slate-500 text-sm">
+              Пользователей пока нет. Нажмите «Добавить пользователя».
+            </p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">
+                  Пользователь
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">
+                  Email
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">
+                  Роль
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">
+                  Статус
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">
+                  Создан
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">
+                  Последний вход
+                </th>
+                <th className="px-6 py-4 text-center text-sm font-semibold text-slate-900">
+                  Действия
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => (
+                <tr key={u.id} className="border-t border-slate-200 hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm text-slate-900 font-medium">
+                    {u.full_name || '—'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{u.email}</td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[u.role] || ROLE_COLORS.user}`}
+                    >
+                      {ROLE_LABELS[u.role] || u.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {u.confirmed ? (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        Активен
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        Приглашение отправлено
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-500">
+                    {new Date(u.created_at).toLocaleDateString('ru-RU')}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-500">
+                    {u.last_sign_in_at
+                      ? new Date(u.last_sign_in_at).toLocaleString('ru-RU')
+                      : '—'}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => removeUser(u.id, u.email)}
+                      className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {singleOpen && (
+        <SingleInviteModal
+          onClose={() => setSingleOpen(false)}
+          onDone={load}
+        />
+      )}
+      {bulkOpen && (
+        <BulkInviteModal onClose={() => setBulkOpen(false)} onDone={load} />
+      )}
+    </div>
+  )
+}
+
+function SingleInviteModal({
+  onClose,
+  onDone,
+}: {
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [role, setRole] = useState('user')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const submit = async () => {
+    setBusy(true)
+    setMsg('')
+    const r = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, full_name: fullName, role }),
+    })
+    const j = await r.json()
+    setBusy(false)
+    if (!r.ok) {
+      setMsg(j.error || 'Ошибка')
+      return
+    }
+    const result = j.results?.[0]
+    if (result?.ok) {
+      onDone()
+      onClose()
+    } else {
+      setMsg(result?.error || 'Ошибка')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg w-full max-w-md">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-bold text-slate-900">Пригласить пользователя</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={20} />
           </button>
-          <button className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors">
-            Следующая
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@talentsy.ru"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Имя (необязательно)
+            </label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Иван Иванов"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Роль
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            >
+              <option value="user">Пользователь</option>
+              <option value="manager">Менеджер</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </div>
+          <p className="text-xs text-slate-500 flex items-start gap-2">
+            <Mail size={14} className="mt-0.5 flex-shrink-0" />
+            На указанный email будет отправлено приглашение со ссылкой для установки пароля.
+          </p>
+          {msg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+              {msg}
+            </p>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy || !email}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+          >
+            {busy ? 'Отправляем...' : 'Отправить приглашение'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BulkInviteModal({
+  onClose,
+  onDone,
+}: {
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [text, setText] = useState('')
+  const [role, setRole] = useState('user')
+  const [busy, setBusy] = useState(false)
+  const [results, setResults] = useState<
+    { email: string; ok: boolean; error?: string }[] | null
+  >(null)
+
+  const submit = async () => {
+    const emails = text
+      .split(/[\s,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (emails.length === 0) return
+    setBusy(true)
+    setResults(null)
+    const r = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ emails, role }),
+    })
+    const j = await r.json()
+    setBusy(false)
+    if (!r.ok) {
+      setResults([{ email: '—', ok: false, error: j.error }])
+      return
+    }
+    setResults(j.results || [])
+    onDone()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg w-full max-w-xl">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-bold text-slate-900">Массовая загрузка</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Email-адреса (по одному в строке или через запятую)
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={8}
+              placeholder={'user1@talentsy.ru\nuser2@talentsy.ru\nuser3@talentsy.ru'}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Роль для всех
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            >
+              <option value="user">Пользователь</option>
+              <option value="manager">Менеджер</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </div>
+          <p className="text-xs text-slate-500 flex items-start gap-2">
+            <Mail size={14} className="mt-0.5 flex-shrink-0" />
+            Каждому адресу будет отправлено приглашение со ссылкой для установки пароля.
+          </p>
+          {results && (
+            <div className="border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
+              {results.map((r, i) => (
+                <div
+                  key={i}
+                  className={`px-3 py-2 text-xs flex items-center justify-between border-b border-slate-100 last:border-0 ${
+                    r.ok ? 'text-green-700' : 'text-red-700 bg-red-50'
+                  }`}
+                >
+                  <span>{r.email}</span>
+                  <span>{r.ok ? '✓ отправлено' : `✗ ${r.error}`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+          >
+            Закрыть
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy || !text.trim()}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+          >
+            {busy ? 'Отправляем...' : 'Отправить приглашения'}
           </button>
         </div>
       </div>

@@ -9,8 +9,30 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetMode, setResetMode] = useState(false)
   const router = useRouter()
+
+  const handleReset = async () => {
+    setError('')
+    setInfo('')
+    if (!email) {
+      setError('Введите email')
+      return
+    }
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/set-password`,
+      })
+      if (error) setError(error.message)
+      else setInfo('Письмо с инструкцией отправлено на ' + email)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -59,6 +81,11 @@ export default function LoginPage() {
               <p className="text-sm text-red-700 font-medium">{error}</p>
             </div>
           )}
+          {info && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-700 font-medium">{info}</p>
+            </div>
+          )}
 
           {/* Email Field */}
           <div className="space-y-2">
@@ -101,6 +128,15 @@ export default function LoginPage() {
             className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-medium py-2 rounded-lg transition duration-200 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={loading}
+            className="w-full text-sm text-purple-600 hover:text-purple-700 font-medium"
+          >
+            Восстановить пароль
           </button>
 
           {/* Divider */}
