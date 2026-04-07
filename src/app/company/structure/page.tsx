@@ -14,6 +14,7 @@ import {
   Plus,
   Trash2,
   Save,
+  Pencil,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
@@ -530,6 +531,13 @@ function OrgNode({
         {/* Actions */}
         {!isEditing && (
           <div className="flex items-center gap-0.5 flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(person) }}
+              className="p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded"
+              title="Редактировать роль"
+            >
+              <Pencil size={13} />
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onAdd(person.id) }}
               className="p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded"
