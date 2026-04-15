@@ -15,6 +15,7 @@ import {
   X,
   Search,
   Send,
+  Pencil,
 } from 'lucide-react'
 
 const DEPARTMENTS: Record<string, string> = {
@@ -215,18 +216,27 @@ function DocPickerModal({
 
 function CreateMeetingModal({
   department,
+  existing,
   onClose,
   onCreated,
 }: {
   department: string
+  existing?: Meeting | null
   onClose: () => void
   onCreated: () => void
 }) {
-  const [title, setTitle] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [type, setType] = useState('plan_fact')
-  const [doc, setDoc] = useState<DocOption | null>(null)
-  const [externalUrl, setExternalUrl] = useState('')
+  const isEdit = !!existing
+  const [title, setTitle] = useState(existing?.title || '')
+  const [date, setDate] = useState(
+    existing?.meeting_date || new Date().toISOString().slice(0, 10)
+  )
+  const [type, setType] = useState(existing?.meeting_type || 'plan_fact')
+  const [doc, setDoc] = useState<DocOption | null>(
+    existing?.doc_id && existing?.doc_title
+      ? { id: existing.doc_id, title: existing.doc_title }
+      : null
+  )
+  const [externalUrl, setExternalUrl] = useState(existing?.external_url || '')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -235,16 +245,19 @@ function CreateMeetingModal({
     const finalTitle =
       title.trim() ||
       `${TYPE_LABELS[type]} ${new Date(date).toLocaleDateString('ru-RU')}`
-    await getSupabase()
-      .from('meetings')
-      .insert({
-        department,
-        title: finalTitle,
-        meeting_date: date,
-        meeting_type: type,
-        doc_id: doc?.id || null,
-        external_url: externalUrl.trim() || null,
-      })
+    const payload = {
+      department,
+      title: finalTitle,
+      meeting_date: date,
+      meeting_type: type,
+      doc_id: doc?.id || null,
+      external_url: externalUrl.trim() || null,
+    }
+    if (isEdit && existing) {
+      await getSupabase().from('meetings').update(payload).eq('id', existing.id)
+    } else {
+      await getSupabase().from('meetings').insert(payload)
+    }
     setSaving(false)
     onCreated()
     onClose()
@@ -254,7 +267,7 @@ function CreateMeetingModal({
     <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg w-full max-w-lg">
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-bold text-slate-900">Новая планерка</h3>
+          <h3 className="font-bold text-slate-900">{isEdit ? 'Редактировать планерку' : 'Новая планерка'}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={20} />
           </button>
@@ -348,7 +361,7 @@ function CreateMeetingModal({
             disabled={saving}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
           >
-            {saving ? 'Создаем...' : 'Создать'}
+            {saving ? 'Сохраняем...' : isEdit ? 'Сохранить' : 'Создать'}
           </button>
         </div>
       </div>
@@ -529,10 +542,12 @@ function MeetingCard({
   meeting,
   people,
   onDelete,
+  onEdit,
 }: {
   meeting: Meeting
   people: FlatPerson[]
   onDelete: () => void
+  onEdit: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [decisions, setDecisions] = useState<Decision[]>([])
@@ -623,15 +638,28 @@ function MeetingCard({
               </div>
             </div>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              if (confirm('Удалить планерку?')) onDelete()
-            }}
-            className="text-slate-400 hover:text-red-600 p-1"
-          >
-            <Trash2 size={14} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit()
+              }}
+              className="text-slate-400 hover:text-purple-600 p-1"
+              title="Редактировать"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm('Удалить планерку?')) onDelete()
+              }}
+              className="text-slate-400 hover:text-red-600 p-1"
+              title="Удалить"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
       </div>
       {expanded && (
@@ -683,6 +711,7 @@ export default function MeetingsDeptPage({
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
   const [people, setPeople] = useState<FlatPerson[]>([])
   const [filter, setFilter] = useState<string>('all')
 
@@ -791,6 +820,7 @@ export default function MeetingsDeptPage({
               meeting={m}
               people={people}
               onDelete={() => deleteMeeting(m.id)}
+              onEdit={() => setEditingMeeting(m)}
             />
           ))}
         </div>
@@ -800,6 +830,15 @@ export default function MeetingsDeptPage({
         <CreateMeetingModal
           department={dept}
           onClose={() => setCreateOpen(false)}
+          onCreated={load}
+        />
+      )}
+
+      {editingMeeting && (
+        <CreateMeetingModal
+          department={dept}
+          existing={editingMeeting}
+          onClose={() => setEditingMeeting(null)}
           onCreated={load}
         />
       )}
