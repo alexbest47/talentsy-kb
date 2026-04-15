@@ -422,6 +422,111 @@ export type Database = {
         }
       }
     }
+      checklist_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      checklist_template_steps: {
+        Row: {
+          id: string
+          template_id: string
+          title: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          title: string
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          template_id?: string
+          title?: string
+          sort_order?: number
+          created_at?: string
+        }
+      }
+      checklist_projects: {
+        Row: {
+          id: string
+          template_id: string
+          name: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          name: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          template_id?: string
+          name?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      checklist_project_items: {
+        Row: {
+          id: string
+          project_id: string
+          step_id: string | null
+          title: string
+          checked: boolean
+          sort_order: number
+          checked_at: string | null
+          checked_by: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          step_id?: string | null
+          title: string
+          checked?: boolean
+          sort_order?: number
+          checked_at?: string | null
+          checked_by?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          step_id?: string | null
+          title?: string
+          checked?: boolean
+          sort_order?: number
+          checked_at?: string | null
+          checked_by?: string | null
+        }
+      }
+    }
     Enums: {
       user_role: 'admin' | 'head' | 'employee' | 'guest'
       document_status: 'draft' | 'published' | 'archived'

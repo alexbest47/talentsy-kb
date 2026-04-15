@@ -20,6 +20,7 @@ import {
   User,
   GraduationCap,
   CalendarClock,
+  ClipboardCheck,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useRoleStore, ROLE_LABELS, ROLE_COLORS, type UserRole } from '@/lib/stores/role-store'
@@ -178,6 +179,12 @@ export default function Sidebar() {
       label: 'Документы',
       icon: <FileText size={20} />,
       href: '/docs',
+    },
+    {
+      id: 'checklists',
+      label: 'Чек-листы',
+      icon: <ClipboardCheck size={20} />,
+      href: '/checklists',
     },
     {
       id: 'admin',
