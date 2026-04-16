@@ -93,16 +93,16 @@ export default function Sidebar() {
         if (userErr) console.warn('[sidebar] getUser error:', userErr.message)
         if (!user || !mounted) return
 
-        // Загружаем профиль + slug отдела одним запросом
-        // FK profiles.department_id → departments (не org_departments!)
-        const { data: prof, error: profErr } = await supabase
+        // 1. Загружаем профиль (без JOIN — надёжнее)
+        const { data: rawProf, error: profErr } = await supabase
           .from('profiles')
-          .select('full_name, position, role, email, department_id, departments(slug)')
+          .select('full_name, position, role, email, department_id')
           .eq('id', user.id)
           .maybeSingle()
         if (profErr) console.warn('[sidebar] profile fetch error:', profErr.message)
         if (!mounted) return
 
+        const prof = rawProf as { full_name: string; position: string | null; role: string; email: string; department_id: string | null } | null
         const meta: any = user.user_metadata || {}
         const dbRole = (prof?.role as UserRole) || 'employee'
 
@@ -115,10 +115,18 @@ export default function Sidebar() {
         setRealRole(dbRole)
         setRole(dbRole)
 
-        // slug отдела (из join)
-        const dept = (prof as any)?.departments
-        if (dept?.slug) {
-          setUserDeptSlug(dept.slug)
+        // 2. Загружаем slug отдела отдельным запросом (если есть department_id)
+        if (prof?.department_id) {
+          const { data: rawDept, error: deptErr } = await supabase
+            .from('departments')
+            .select('slug')
+            .eq('id', prof.department_id)
+            .maybeSingle()
+          if (deptErr) console.warn('[sidebar] department fetch error:', deptErr.message)
+          const dept = rawDept as { slug: string } | null
+          if (dept?.slug && mounted) {
+            setUserDeptSlug(dept.slug)
+          }
         }
       } catch (e) {
         console.error('[sidebar] failed to load auth profile:', e)

@@ -215,6 +215,12 @@ export default function UsersPage() {
   )
 }
 
+interface Department {
+  id: string
+  name: string
+  slug: string
+}
+
 function SingleInviteModal({
   onClose,
   onDone,
@@ -225,8 +231,28 @@ function SingleInviteModal({
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState('employee')
+  const [departmentId, setDepartmentId] = useState('')
+  const [departments, setDepartments] = useState<Department[]>([])
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+
+  // Загружаем список отделов
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('departments')
+          .select('id, name, slug')
+          .order('name')
+        if (data) setDepartments(data)
+      } catch (e) {
+        console.warn('Failed to load departments:', e)
+      }
+    }
+    loadDepartments()
+  }, [])
 
   const submit = async () => {
     setBusy(true)
@@ -234,7 +260,12 @@ function SingleInviteModal({
     const r = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, full_name: fullName, role }),
+      body: JSON.stringify({
+        email,
+        full_name: fullName,
+        role,
+        department_id: departmentId || undefined,
+      }),
     })
     const j = await r.json()
     setBusy(false)
@@ -296,6 +327,23 @@ function SingleInviteModal({
               <option value="employee">Сотрудник</option>
               <option value="head">Руководитель</option>
               <option value="admin">Администратор</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Отдел
+            </label>
+            <select
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            >
+              <option value="">— Не выбран —</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
             </select>
           </div>
           <p className="text-xs text-slate-500 flex items-start gap-2">

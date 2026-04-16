@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     const rawRole: string = body.role || 'employee'
     const role = VALID_ROLES.has(rawRole) ? rawRole : 'employee'
     const full_name: string | undefined = body.full_name
+    const department_id: string | undefined = body.department_id || undefined
 
     const admin = getAdminClient()
     const results: { email: string; ok: boolean; error?: string }[] = []
@@ -106,13 +107,20 @@ export async function POST(req: NextRequest) {
         results.push({ email, ok: false, error: 'Некорректный email' })
         continue
       }
-      const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+      const { data: inviteData, error } = await admin.auth.admin.inviteUserByEmail(email, {
         data: { role, full_name: full_name || '' },
         redirectTo: `${SITE_URL}/auth/set-password`,
       })
       if (error) {
         results.push({ email, ok: false, error: error.message })
       } else {
+        // Устанавливаем department_id в профиле (триггер создаёт профиль без него)
+        if (department_id && inviteData?.user?.id) {
+          await admin
+            .from('profiles')
+            .update({ department_id })
+            .eq('id', inviteData.user.id)
+        }
         results.push({ email, ok: true })
       }
     }
