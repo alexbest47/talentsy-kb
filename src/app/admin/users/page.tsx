@@ -215,10 +215,27 @@ export default function UsersPage() {
   )
 }
 
-interface Department {
+interface OrgEmployee {
   id: string
   name: string
+  role: string
+  department_slug: string
+  is_vacancy: boolean
+}
+
+interface OrgDepartment {
   slug: string
+  name: string
+}
+
+const DEPT_LABELS: Record<string, string> = {
+  sales: 'Продажи',
+  marketing: 'Маркетинг',
+  product: 'Продукт',
+  tech: 'Технический отдел',
+  finance: 'Финансы',
+  admin: 'Администрация',
+  hr: 'HR',
 }
 
 function SingleInviteModal({
@@ -229,32 +246,75 @@ function SingleInviteModal({
   onDone: () => void
 }) {
   const [email, setEmail] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('employee')
-  const [departmentId, setDepartmentId] = useState('')
-  const [departments, setDepartments] = useState<Department[]>([])
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [employees, setEmployees] = useState<OrgEmployee[]>([])
+  const [orgDepts, setOrgDepts] = useState<OrgDepartment[]>([])
+  const [sysRole, setSysRole] = useState('employee')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+  const [loadingOrg, setLoadingOrg] = useState(true)
 
-  // Загружаем список отделов
+  // Загружаем сотрудников из оргструктуры
   useEffect(() => {
-    const loadDepartments = async () => {
+    const loadOrg = async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
-        const { data } = await supabase
-          .from('departments')
-          .select('id, name, slug')
-          .order('name')
-        if (data) setDepartments(data)
+
+        const [empRes, deptRes] = await Promise.all([
+          supabase
+            .from('org_employees')
+            .select('id, name, role, department_slug, is_vacancy')
+            .eq('is_vacancy', false)
+            .order('name'),
+          supabase
+            .from('org_departments')
+            .select('slug, name')
+            .order('sort_order'),
+        ])
+
+        if (empRes.data) setEmployees(empRes.data as OrgEmployee[])
+        if (deptRes.data) setOrgDepts(deptRes.data as OrgDepartment[])
       } catch (e) {
-        console.warn('Failed to load departments:', e)
+        console.warn('Failed to load org structure:', e)
+      } finally {
+        setLoadingOrg(false)
       }
     }
-    loadDepartments()
+    loadOrg()
   }, [])
 
+  const selectedEmployee = employees.find((e) => e.id === selectedEmployeeId)
+
+  // Фильтрация по поиску
+  const filteredEmployees = searchQuery.trim()
+    ? employees.filter(
+        (e) =>
+          e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          e.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (DEPT_LABELS[e.department_slug] || e.department_slug)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+      )
+    : employees
+
+  // Группировка по отделам
+  const groupedByDept = filteredEmployees.reduce(
+    (acc, emp) => {
+      const key = emp.department_slug
+      if (!acc[key]) acc[key] = []
+      acc[key].push(emp)
+      return acc
+    },
+    {} as Record<string, OrgEmployee[]>
+  )
+
   const submit = async () => {
+    if (!selectedEmployee) {
+      setMsg('Выберите сотрудника из оргструктуры')
+      return
+    }
     setBusy(true)
     setMsg('')
     const r = await fetch('/api/admin/users', {
@@ -262,9 +322,11 @@ function SingleInviteModal({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         email,
-        full_name: fullName,
-        role,
-        department_id: departmentId || undefined,
+        full_name: selectedEmployee.name,
+        role: sysRole,
+        department_slug: selectedEmployee.department_slug,
+        org_employee_id: selectedEmployee.id,
+        position: selectedEmployee.role,
       }),
     })
     const j = await r.json()
@@ -284,17 +346,90 @@ function SingleInviteModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-md">
+      <div className="bg-white rounded-lg w-full max-w-lg">
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-bold text-slate-900">Пригласить пользователя</h3>
+          <h3 className="font-bold text-slate-900">Пригласить сотрудника</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
         <div className="p-5 space-y-4">
+          {/* Поиск и выбор сотрудника из оргструктуры */}
           <div>
             <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-              Email
+              Сотрудник из оргструктуры
+            </label>
+            {selectedEmployee ? (
+              <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-purple-900">
+                    {selectedEmployee.name}
+                  </p>
+                  <p className="text-xs text-purple-600">
+                    {selectedEmployee.role} · {DEPT_LABELS[selectedEmployee.department_slug] || selectedEmployee.department_slug}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedEmployeeId('')
+                    setSearchQuery('')
+                  }}
+                  className="text-purple-400 hover:text-purple-600"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Поиск по имени, должности, отделу..."
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  />
+                </div>
+                <div className="mt-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  {loadingOrg ? (
+                    <p className="p-3 text-sm text-slate-400 text-center">
+                      Загрузка оргструктуры...
+                    </p>
+                  ) : filteredEmployees.length === 0 ? (
+                    <p className="p-3 text-sm text-slate-400 text-center">
+                      Никого не найдено
+                    </p>
+                  ) : (
+                    Object.entries(groupedByDept).map(([deptSlug, emps]) => (
+                      <div key={deptSlug}>
+                        <div className="px-3 py-1.5 bg-slate-50 text-xs font-medium text-slate-500 uppercase tracking-wider sticky top-0">
+                          {DEPT_LABELS[deptSlug] || deptSlug}
+                        </div>
+                        {emps.map((emp) => (
+                          <button
+                            key={emp.id}
+                            onClick={() => setSelectedEmployeeId(emp.id)}
+                            className="w-full text-left px-3 py-2 hover:bg-purple-50 transition-colors"
+                          >
+                            <p className="text-sm text-slate-900">{emp.name}</p>
+                            <p className="text-xs text-slate-500">{emp.role}</p>
+                          </button>
+                        ))}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              Email сотрудника
             </label>
             <input
               type="email"
@@ -304,24 +439,15 @@ function SingleInviteModal({
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
             />
           </div>
+
+          {/* Системная роль */}
           <div>
             <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-              Имя (необязательно)
-            </label>
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Иван Иванов"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-              Роль
+              Роль в системе
             </label>
             <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
+              value={sysRole}
+              onChange={(e) => setSysRole(e.target.value)}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
             >
               <option value="employee">Сотрудник</option>
@@ -329,23 +455,7 @@ function SingleInviteModal({
               <option value="admin">Администратор</option>
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-              Отдел
-            </label>
-            <select
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-            >
-              <option value="">— Не выбран —</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
+
           <p className="text-xs text-slate-500 flex items-start gap-2">
             <Mail size={14} className="mt-0.5 flex-shrink-0" />
             На указанный email будет отправлено приглашение со ссылкой для установки пароля.
@@ -365,7 +475,7 @@ function SingleInviteModal({
           </button>
           <button
             onClick={submit}
-            disabled={busy || !email}
+            disabled={busy || !email || !selectedEmployeeId}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
           >
             {busy ? 'Отправляем...' : 'Отправить приглашение'}

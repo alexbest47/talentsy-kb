@@ -86,11 +86,19 @@ export default function Sidebar() {
 
     const load = async () => {
       try {
-        const {
-          data: { user },
-          error: userErr,
-        } = await supabase.auth.getUser()
-        if (userErr) console.warn('[sidebar] getUser error:', userErr.message)
+        // Пробуем getUser (сетевой запрос к Supabase GoTrue).
+        // Если не получается — fallback на getSession (локальные куки).
+        let user: any = null
+
+        const { data: userData, error: userErr } = await supabase.auth.getUser()
+        if (userErr || !userData?.user) {
+          console.warn('[sidebar] getUser failed, trying getSession:', userErr?.message)
+          const { data: sessData } = await supabase.auth.getSession()
+          user = sessData?.session?.user ?? null
+        } else {
+          user = userData.user
+        }
+
         if (!user || !mounted) return
 
         // 1. Загружаем профиль (без JOIN — надёжнее)
@@ -134,7 +142,10 @@ export default function Sidebar() {
     }
 
     load()
-    const { data: sub } = supabase.auth.onAuthStateChange(() => load())
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Если пришло событие с сессией — сразу загружаем профиль
+      if (session?.user) load()
+    })
     return () => {
       mounted = false
       sub.subscription.unsubscribe()

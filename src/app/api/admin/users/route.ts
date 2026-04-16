@@ -34,7 +34,7 @@ async function requireAdmin(): Promise<NextResponse | null> {
     .select('role')
     .eq('id', user.id)
     .single()
-  if (error || !profile || profile.role !== 'admin') {
+  if (error || !profile || (profile as any).role !== 'admin') {
     return NextResponse.json(
       { error: 'Доступ запрещён: требуется роль администратора' },
       { status: 403 }
@@ -96,10 +96,23 @@ export async function POST(req: NextRequest) {
     const rawRole: string = body.role || 'employee'
     const role = VALID_ROLES.has(rawRole) ? rawRole : 'employee'
     const full_name: string | undefined = body.full_name
-    const department_id: string | undefined = body.department_id || undefined
+    const department_slug: string | undefined = body.department_slug || undefined
+    const position: string | undefined = body.position || undefined
+    const org_employee_id: string | undefined = body.org_employee_id || undefined
 
     const admin = getAdminClient()
     const results: { email: string; ok: boolean; error?: string }[] = []
+
+    // Если передан department_slug — находим department_id
+    let department_id: string | undefined = body.department_id || undefined
+    if (!department_id && department_slug) {
+      const { data: dept } = await admin
+        .from('departments')
+        .select('id')
+        .eq('slug', department_slug)
+        .maybeSingle()
+      if (dept) department_id = dept.id
+    }
 
     for (const rawEmail of emails) {
       const email = String(rawEmail).trim().toLowerCase()
@@ -114,12 +127,16 @@ export async function POST(req: NextRequest) {
       if (error) {
         results.push({ email, ok: false, error: error.message })
       } else {
-        // Устанавливаем department_id в профиле (триггер создаёт профиль без него)
-        if (department_id && inviteData?.user?.id) {
-          await admin
-            .from('profiles')
-            .update({ department_id })
-            .eq('id', inviteData.user.id)
+        // Обновляем профиль: отдел, должность, org_employee_id
+        const userId = inviteData?.user?.id
+        if (userId) {
+          const updates: Record<string, any> = {}
+          if (department_id) updates.department_id = department_id
+          if (position) updates.position = position
+          if (org_employee_id) updates.org_employee_id = org_employee_id
+          if (Object.keys(updates).length > 0) {
+            await admin.from('profiles').update(updates).eq('id', userId)
+          }
         }
         results.push({ email, ok: true })
       }
