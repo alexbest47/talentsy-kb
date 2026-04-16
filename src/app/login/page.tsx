@@ -25,7 +25,10 @@ export default function LoginPage() {
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/set-password`,
+        // Route through the server-side callback so PKCE code exchange happens
+        // on the server (cookies). Avoids client-side code_verifier issues when
+        // the email is opened in a different browser/context.
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/auth/set-password')}`,
       })
       if (error) setError(error.message)
       else setInfo('Письмо с инструкцией отправлено на ' + email)

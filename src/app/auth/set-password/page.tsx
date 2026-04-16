@@ -15,18 +15,31 @@ export default function SetPasswordPage() {
 
   useEffect(() => {
     const init = async () => {
-      // PKCE flow: ?code=...
+      // 0. Если сессия уже есть (например, после /auth/callback) — сразу готово.
+      const existing = await supabase.auth.getSession()
+      if (existing.data.session) {
+        setReady(true)
+        // почистим URL от возможных code/hash
+        const url0 = new URL(window.location.href)
+        window.history.replaceState({}, '', url0.pathname)
+        return
+      }
+
+      // PKCE flow: ?code=...  (fallback если сюда пришли напрямую, минуя /auth/callback)
       const url = new URL(window.location.href)
       const code = url.searchParams.get('code')
       if (code) {
         try {
           await supabase.auth.exchangeCodeForSession(code)
         } catch (e: any) {
-          setError(e?.message || 'Не удалось активировать ссылку приглашения')
+          setError(
+            e?.message ||
+              'Не удалось активировать ссылку. Откройте письмо в том же браузере, в котором запрашивали восстановление, или запросите новую ссылку.'
+          )
         }
-        // clean URL
         window.history.replaceState({}, '', url.pathname)
       } else if (window.location.hash.includes('access_token')) {
+        // Implicit flow (часто для инвайтов): #access_token=...&refresh_token=...
         const hash = new URLSearchParams(window.location.hash.slice(1))
         const access_token = hash.get('access_token') || ''
         const refresh_token = hash.get('refresh_token') || ''

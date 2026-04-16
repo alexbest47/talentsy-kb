@@ -24,7 +24,7 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, searchParams } = request.nextUrl
 
   // Static & асеты пропускаем
   if (
@@ -33,6 +33,22 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/public')
   ) {
     return NextResponse.next()
+  }
+
+  // Supabase PKCE code приходит как ?code=... Если Supabase укоротил redirect_to
+  // до корня — перехватываем здесь и проксируем в /auth/callback, чтобы не потерять code.
+  const pkceCode = searchParams.get('code')
+  if (pkceCode && !pathname.startsWith('/auth/callback')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/callback'
+    // сохраняем текущий путь как next (если это не login/share-only)
+    const next =
+      pathname === '/' || pathname === '/login' || pathname === '/share-only'
+        ? '/auth/set-password'
+        : pathname
+    url.searchParams.set('code', pkceCode)
+    url.searchParams.set('next', next)
+    return NextResponse.redirect(url)
   }
 
   let response = NextResponse.next({
