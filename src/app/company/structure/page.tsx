@@ -387,8 +387,9 @@ function OrgNode({
   setEditData: (d: { name: string; position: string; isVacancy: boolean; priority: string }) => void
   onSaveEdit: () => void
   onCancelEdit: () => void
-  readOnly?: boolean
 }) {
+  const { role } = useRoleStore()
+  const readOnly = role === 'employee'
   const [expanded, setExpanded] = useState(level < 2)
   const hasChildren = person.children && person.children.length > 0
   const childCount = hasChildren ? person.children!.length : 0
@@ -593,7 +594,6 @@ function OrgNode({
               setEditData={setEditData}
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
-              readOnly={readOnly}
             />
           ))}
         </div>
@@ -868,21 +868,20 @@ export default function StructurePage() {
         <OrgNode
           person={orgData}
           level={0}
-          draggedId={readOnly ? null : draggedId}
-          dropTargetId={readOnly ? null : dropTargetId}
-          onDragStart={readOnly ? () => {} : handleDragStart}
-          onDragOver={readOnly ? () => {} : handleDragOver}
-          onDrop={readOnly ? () => {} : handleDrop}
-          onDragEnd={readOnly ? () => {} : handleDragEnd}
-          onEdit={readOnly ? () => {} : handleEdit}
-          onAdd={readOnly ? () => {} : handleAdd}
-          onDelete={readOnly ? () => {} : handleDelete}
-          editingId={readOnly ? null : editingId}
-          editData={readOnly ? null : editData}
-          setEditData={readOnly ? () => {} : setEditData}
-          onSaveEdit={readOnly ? () => {} : handleSaveEdit}
-          onCancelEdit={readOnly ? () => {} : handleCancelEdit}
-          readOnly={readOnly}
+          draggedId={draggedId}
+          dropTargetId={dropTargetId}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
+          onEdit={handleEdit}
+          onAdd={handleAdd}
+          onDelete={handleDelete}
+          editingId={editingId}
+          editData={editData}
+          setEditData={setEditData}
+          onSaveEdit={handleSaveEdit}
+          onCancelEdit={handleCancelEdit}
         />
       </div>
 
