@@ -64,11 +64,20 @@ export async function middleware(request: NextRequest) {
         setAll(
           cookiesToSet: { name: string; value: string; options?: CookieOptions }[]
         ) {
-          cookiesToSet.forEach(({ name, value, options }) => {
+          // 1. Сначала обновляем ВСЕ куки в request (для downstream обработчиков)
+          cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value)
-            response = NextResponse.next({
-              request: { headers: request.headers },
-            })
+          })
+          // 2. Создаём response ОДИН раз (а не в цикле!) —
+          //    иначе каждая итерация перезаписывает response и
+          //    Set-Cookie хедеры предыдущих кук теряются.
+          //    Supabase хранит токен в нескольких chunked-куках
+          //    (sb-xxx-auth-token.0, .1, …), все они должны попасть в ответ.
+          response = NextResponse.next({
+            request: { headers: request.headers },
+          })
+          // 3. Устанавливаем ВСЕ Set-Cookie хедеры на ОДИН response
+          cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options as CookieOptions)
           })
         },
