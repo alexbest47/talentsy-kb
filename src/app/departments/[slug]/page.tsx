@@ -282,12 +282,14 @@ function EmployeeRow({
   onSave,
   onDelete,
   editingId,
+  readOnly,
 }: {
   employee: OrgEmployee
   onEdit: (id: string) => void
   onSave: (id: string, name: string, role: string, note: string | null) => void
   onDelete: (id: string) => void
   editingId: string | null
+  readOnly?: boolean
 }) {
   const [editName, setEditName] = useState(employee.name)
   const [editRole, setEditRole] = useState(employee.role)
@@ -352,18 +354,22 @@ function EmployeeRow({
           {employee.note}
         </span>
       )}
-      <button
-        onClick={() => onEdit(employee.id)}
-        className="p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-purple-600 hover:bg-purple-50 rounded transition-all flex-shrink-0"
-      >
-        <Edit size={14} />
-      </button>
-      <button
-        onClick={() => onDelete(employee.id)}
-        className="p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 rounded transition-all flex-shrink-0"
-      >
-        <Trash2 size={14} />
-      </button>
+      {!readOnly && (
+        <button
+          onClick={() => onEdit(employee.id)}
+          className="p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-purple-600 hover:bg-purple-50 rounded transition-all flex-shrink-0"
+        >
+          <Edit size={14} />
+        </button>
+      )}
+      {!readOnly && (
+        <button
+          onClick={() => onDelete(employee.id)}
+          className="p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 rounded transition-all flex-shrink-0"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   )
 }
@@ -376,6 +382,7 @@ function StructureTab({
   onEmployeeAdd,
   onEmployeeDelete,
   onUnitAdd,
+  readOnly,
 }: {
   dept: DepartmentData
   units: OrgUnit[]
@@ -384,6 +391,7 @@ function StructureTab({
   onEmployeeAdd: (name: string, role: string, note: string | null, addingTo: 'direct' | string) => void
   onEmployeeDelete: (id: string) => void
   onUnitAdd: () => void
+  readOnly?: boolean
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [addingTo, setAddingTo] = useState<string | null>(null)
@@ -430,10 +438,12 @@ function StructureTab({
             <p className="text-sm font-medium text-slate-900">{dept.reports_to}</p>
           </div>
         </div>
-        <button className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors">
-          <Edit size={14} />
-          Редактировать
-        </button>
+        {!readOnly && (
+          <button className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors">
+            <Edit size={14} />
+            Редактировать
+          </button>
+        )}
       </div>
 
       {/* Direct reports */}
@@ -449,9 +459,10 @@ function StructureTab({
                 onSave={handleSave}
                 onDelete={onEmployeeDelete}
                 editingId={editingId}
+                readOnly={readOnly}
               />
             ))}
-            {addingTo === 'direct' && (
+            {!readOnly && addingTo === 'direct' && (
               <div className="py-3 px-3 bg-purple-50 border-b border-slate-100">
                 <div className="space-y-2">
                   <input
@@ -488,13 +499,15 @@ function StructureTab({
               </div>
             )}
           </div>
-          <button
-            onClick={() => setAddingTo('direct')}
-            className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
-          >
-            <Plus size={14} />
-            Добавить сотрудника
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setAddingTo('direct')}
+              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
+            >
+              <Plus size={14} />
+              Добавить сотрудника
+            </button>
+          )}
         </div>
       )}
 
@@ -539,9 +552,10 @@ function StructureTab({
                     onSave={handleSave}
                     onDelete={onEmployeeDelete}
                     editingId={editingId}
+                    readOnly={readOnly}
                   />
                 ))}
-                {addingTo === unit.id && (
+                {!readOnly && addingTo === unit.id && (
                   <div className="py-3 px-3 bg-purple-50 border-b border-slate-100">
                     <div className="space-y-2">
                       <input
@@ -579,27 +593,31 @@ function StructureTab({
                 )}
               </div>
             </div>
-            <button
-              onClick={() => setAddingTo(unit.id)}
-              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
-            >
-              <Plus size={14} />
-              Добавить сотрудника
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => setAddingTo(unit.id)}
+                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
+              >
+                <Plus size={14} />
+                Добавить сотрудника
+              </button>
+            )}
           </div>
         )
       })}
 
       {/* Add sub-unit */}
-      <div className="pt-4">
-        <button
-          onClick={onUnitAdd}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-        >
-          <Plus size={16} />
-          Добавить подразделение
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="pt-4">
+          <button
+            onClick={onUnitAdd}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+          >
+            <Plus size={16} />
+            Добавить подразделение
+          </button>
+        </div>
+      )}
     </>
   )
 }
@@ -757,6 +775,8 @@ function GoalDetailModal({
 }
 
 function GoalsTab({ slug }: { slug: string }) {
+  const { role } = useRoleStore()
+  const goalsReadOnly = role === 'employee'
   const [goals, setGoals] = useState<PositionGoal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedQuarter, setSelectedQuarter] = useState('Q2-2026')
@@ -875,10 +895,12 @@ function GoalsTab({ slug }: { slug: string }) {
     return (
       <div className="text-center py-12">
         <p className="text-slate-500 mb-4">Целей ещё не добавлено</p>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
-          <Plus size={16} />
-          Добавить цель
-        </button>
+        {!goalsReadOnly && (
+          <button className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
+            <Plus size={16} />
+            Добавить цель
+          </button>
+        )}
       </div>
     )
   }
@@ -1303,6 +1325,8 @@ function ServicesTab({ slug }: { slug: string }) {
 export default function DepartmentPage() {
   const params = useParams()
   const slug = params?.slug as string
+  const { role } = useRoleStore()
+  const readOnly = role === 'employee'
   const [activeTab, setActiveTab] = useState<'vision' | 'structure' | 'goals' | 'documents' | 'services'>('vision')
   const [dept, setDept] = useState<DepartmentData | null>(null)
   const [units, setUnits] = useState<OrgUnit[]>([])
@@ -1573,6 +1597,7 @@ export default function DepartmentPage() {
             onEmployeeAdd={handleEmployeeAdd}
             onEmployeeDelete={handleEmployeeDelete}
             onUnitAdd={handleUnitAdd}
+            readOnly={readOnly}
           />
         )}
         {activeTab === 'documents' && <DocumentsTab slug={slug} />}

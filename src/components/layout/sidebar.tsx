@@ -219,7 +219,10 @@ export default function Sidebar() {
 
   // Все планёрки
   const allMeetings: NavItem[] = [
-    { label: 'DreamTeam', href: '/meetings/dreamteam', deptSlug: '_all' },
+    // DreamTeam доступен только руководителям и админам
+    ...(role !== 'employee'
+      ? [{ label: 'DreamTeam', href: '/meetings/dreamteam', deptSlug: '_all' }]
+      : []),
     { label: 'Продажи', href: '/meetings/sales', deptSlug: 'sales' },
     { label: 'Маркетинг', href: '/meetings/marketing', deptSlug: 'marketing' },
     { label: 'Продукт', href: '/meetings/product', deptSlug: 'product' },

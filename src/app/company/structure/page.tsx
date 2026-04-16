@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
+import { useRoleStore } from '@/lib/stores/role-store'
 
 /* ─── Types ─── */
 interface Person {
@@ -386,6 +387,7 @@ function OrgNode({
   setEditData: (d: { name: string; position: string; isVacancy: boolean; priority: string }) => void
   onSaveEdit: () => void
   onCancelEdit: () => void
+  readOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(level < 2)
   const hasChildren = person.children && person.children.length > 0
@@ -410,7 +412,7 @@ function OrgNode({
       {level > 0 && <div className="absolute -left-6 top-5 w-6 h-px bg-slate-200" />}
 
       <div
-        draggable={level > 0}
+        draggable={!readOnly && level > 0}
         onDragStart={(e) => {
           e.stopPropagation()
           onDragStart(person.id)
@@ -421,11 +423,11 @@ function OrgNode({
         className={clsx(
           'flex items-start gap-2 p-3 rounded-lg border transition-all group',
           borderColor,
-          level > 0 && 'cursor-grab active:cursor-grabbing'
+          !readOnly && level > 0 && 'cursor-grab active:cursor-grabbing'
         )}
       >
         {/* Drag handle */}
-        {level > 0 && (
+        {!readOnly && level > 0 && (
           <div className="mt-1 text-slate-300 group-hover:text-slate-400 flex-shrink-0">
             <GripVertical size={14} />
           </div>
@@ -496,9 +498,9 @@ function OrgNode({
             </div>
           ) : (
             <div
-              onDoubleClick={(e) => { e.stopPropagation(); onEdit(person) }}
-              className="cursor-pointer"
-              title="Дважды кликните для редактирования"
+              onDoubleClick={readOnly ? undefined : (e) => { e.stopPropagation(); onEdit(person) }}
+              className={readOnly ? '' : 'cursor-pointer'}
+              title={readOnly ? undefined : 'Дважды кликните для редактирования'}
             >
               <p className={clsx('font-bold text-sm', person.isVacancy ? 'text-orange-700' : 'text-slate-900')}>
                 {person.position}
@@ -529,7 +531,7 @@ function OrgNode({
         </div>
 
         {/* Actions */}
-        {!isEditing && (
+        {!isEditing && !readOnly && (
           <div className="flex items-center gap-0.5 flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(person) }}
@@ -591,6 +593,7 @@ function OrgNode({
               setEditData={setEditData}
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -603,6 +606,9 @@ function OrgNode({
 const ORG_TREE_ID = '00000000-0000-0000-0000-000000000001'
 
 export default function StructurePage() {
+  const { role } = useRoleStore()
+  const readOnly = role === 'employee'
+
   const [orgData, setOrgData] = useState<Person>(defaultOrgData)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -792,13 +798,19 @@ export default function StructurePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Организационная структура</h1>
-            <p className="text-slate-600">Перетаскивайте сотрудников для изменения подчинения. Дважды кликните для редактирования.</p>
+            <p className="text-slate-600">
+              {readOnly
+                ? 'Структура компании и подчинения.'
+                : 'Перетаскивайте сотрудников для изменения подчинения. Дважды кликните для редактирования.'}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            {saving && <span className="text-xs text-purple-600 animate-pulse">Сохранение...</span>}
-            {hasUnsaved && !saving && <span className="text-xs text-amber-600">Не сохранено</span>}
-            {!hasUnsaved && !saving && <span className="text-xs text-green-600">Сохранено</span>}
-          </div>
+          {!readOnly && (
+            <div className="flex items-center gap-2">
+              {saving && <span className="text-xs text-purple-600 animate-pulse">Сохранение...</span>}
+              {hasUnsaved && !saving && <span className="text-xs text-amber-600">Не сохранено</span>}
+              {!hasUnsaved && !saving && <span className="text-xs text-green-600">Сохранено</span>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -840,10 +852,12 @@ export default function StructurePage() {
           <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium">декрет</span>
           <span>В отпуске</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <GripVertical size={14} className="text-slate-400" />
-          <span>Перетаскивание</span>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-1.5">
+            <GripVertical size={14} className="text-slate-400" />
+            <span>Перетаскивание</span>
+          </div>
+        )}
       </div>
 
       {/* Org Tree */}
@@ -854,20 +868,21 @@ export default function StructurePage() {
         <OrgNode
           person={orgData}
           level={0}
-          draggedId={draggedId}
-          dropTargetId={dropTargetId}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onDragEnd={handleDragEnd}
-          onEdit={handleEdit}
-          onAdd={handleAdd}
-          onDelete={handleDelete}
-          editingId={editingId}
-          editData={editData}
-          setEditData={setEditData}
-          onSaveEdit={handleSaveEdit}
-          onCancelEdit={handleCancelEdit}
+          draggedId={readOnly ? null : draggedId}
+          dropTargetId={readOnly ? null : dropTargetId}
+          onDragStart={readOnly ? () => {} : handleDragStart}
+          onDragOver={readOnly ? () => {} : handleDragOver}
+          onDrop={readOnly ? () => {} : handleDrop}
+          onDragEnd={readOnly ? () => {} : handleDragEnd}
+          onEdit={readOnly ? () => {} : handleEdit}
+          onAdd={readOnly ? () => {} : handleAdd}
+          onDelete={readOnly ? () => {} : handleDelete}
+          editingId={readOnly ? null : editingId}
+          editData={readOnly ? null : editData}
+          setEditData={readOnly ? () => {} : setEditData}
+          onSaveEdit={readOnly ? () => {} : handleSaveEdit}
+          onCancelEdit={readOnly ? () => {} : handleCancelEdit}
+          readOnly={readOnly}
         />
       </div>
 

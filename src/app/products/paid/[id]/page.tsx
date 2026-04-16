@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
+import { useRoleStore } from '@/lib/stores/role-store'
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
 
@@ -134,12 +135,14 @@ function DocCard({
   onDelete,
   onToggleAccess,
   onView,
+  readOnly,
 }: {
   doc: DocItem
   onEdit: () => void
   onDelete: () => void
   onToggleAccess: () => void
   onView: () => void
+  readOnly?: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const shareUrl = doc.access === 'external' && doc.share_token
@@ -202,11 +205,17 @@ function DocCard({
 
         <div className="flex flex-col gap-1 flex-shrink-0">
           <button onClick={onView} title="Просмотр" className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><Eye size={15} /></button>
-          <button onClick={onEdit} title="Редактировать" className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"><Edit3 size={15} /></button>
-          <button onClick={onToggleAccess} title={doc.access === 'external' ? 'Сделать внутренним' : 'Сделать внешним'} className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors">
-            {doc.access === 'external' ? <Unlock size={15} /> : <Lock size={15} />}
-          </button>
-          <button onClick={onDelete} title="Удалить" className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={15} /></button>
+          {!readOnly && (
+            <button onClick={onEdit} title="Редактировать" className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"><Edit3 size={15} /></button>
+          )}
+          {!readOnly && (
+            <button onClick={onToggleAccess} title={doc.access === 'external' ? 'Сделать внутренним' : 'Сделать внешним'} className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors">
+              {doc.access === 'external' ? <Unlock size={15} /> : <Lock size={15} />}
+            </button>
+          )}
+          {!readOnly && (
+            <button onClick={onDelete} title="Удалить" className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={15} /></button>
+          )}
         </div>
       </div>
     </div>
@@ -536,6 +545,7 @@ function DocumentSection({
   onDelete,
   onToggleAccess,
   onView,
+  readOnly,
 }: {
   title: string
   icon: React.ReactNode
@@ -548,6 +558,7 @@ function DocumentSection({
   onDelete: (id: string) => void
   onToggleAccess: (d: DocItem) => void
   onView: (d: DocItem) => void
+  readOnly?: boolean
 }) {
   const sectionDocs = docs.filter((d) => d.category === category)
 
@@ -561,13 +572,15 @@ function DocumentSection({
           <h2 className="text-xl font-bold text-slate-900">{title}</h2>
           <span className="text-sm text-slate-400">({sectionDocs.length})</span>
         </div>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-medium transition-colors"
-        >
-          <Plus size={14} />
-          Добавить документ
-        </button>
+        {!readOnly && (
+          <button
+            onClick={onAdd}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            <Plus size={14} />
+            Добавить документ
+          </button>
+        )}
       </div>
 
       {sectionDocs.length > 0 ? (
@@ -580,6 +593,7 @@ function DocumentSection({
               onDelete={() => onDelete(d.id)}
               onToggleAccess={() => onToggleAccess(d)}
               onView={() => onView(d)}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -608,6 +622,8 @@ export default function ProductDetailPage() {
   const params = useParams()
   const productId = params.id as string
   const hardcodedProduct = productDetails[productId]
+  const { role } = useRoleStore()
+  const readOnly = role === 'employee'
 
   const [product, setProduct] = useState<DbProduct | null>(null)
   const [productLoading, setProductLoading] = useState(true)
@@ -858,9 +874,11 @@ export default function ProductDetailPage() {
             </div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold text-slate-900">{editName || product.name}</h1>
-              <button onClick={() => setEditingProduct(true)} title="Редактировать программу" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-purple-600 transition-colors">
-                <Pencil size={18} />
-              </button>
+              {!readOnly && (
+                <button onClick={() => setEditingProduct(true)} title="Редактировать программу" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-purple-600 transition-colors">
+                  <Pencil size={18} />
+                </button>
+              )}
             </div>
             {editDescription && (
               <p className="text-slate-600 text-sm mb-4">{editDescription}</p>
@@ -889,6 +907,7 @@ export default function ProductDetailPage() {
             onDelete={handleDelete}
             onToggleAccess={handleToggleAccess}
             onView={(d) => setViewingDoc(d)}
+            readOnly={readOnly}
           />
 
           {/* Описание аудитории */}
@@ -904,6 +923,7 @@ export default function ProductDetailPage() {
             onDelete={handleDelete}
             onToggleAccess={handleToggleAccess}
             onView={(d) => setViewingDoc(d)}
+            readOnly={readOnly}
           />
 
           {/* Кейсы */}
@@ -919,6 +939,7 @@ export default function ProductDetailPage() {
             onDelete={handleDelete}
             onToggleAccess={handleToggleAccess}
             onView={(d) => setViewingDoc(d)}
+            readOnly={readOnly}
           />
 
           {/* Прочие документы */}
@@ -934,6 +955,7 @@ export default function ProductDetailPage() {
             onDelete={handleDelete}
             onToggleAccess={handleToggleAccess}
             onView={(d) => setViewingDoc(d)}
+            readOnly={readOnly}
           />
 
           {/* Info footer */}
