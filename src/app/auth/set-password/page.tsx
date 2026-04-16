@@ -81,7 +81,7 @@ export default function SetPasswordPage() {
             Установите пароль
           </h1>
           <p className="text-slate-600 text-sm">
-            Придумайте пароль для входа в Talentsy WorkSpace
+            Придумайте пароль для входа в Talentsy WorkPlace
           </p>
         </div>
 

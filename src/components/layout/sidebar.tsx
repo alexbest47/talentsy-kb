@@ -214,7 +214,7 @@ export default function Sidebar() {
           <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-lg">T</span>
           </div>
-          <span className="text-xl font-bold text-white">Talentsy WorkSpace</span>
+          <span className="text-xl font-bold text-white">Talentsy WorkPlace</span>
         </Link>
       </div>
 

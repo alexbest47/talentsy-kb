@@ -421,7 +421,6 @@ export type Database = {
           created_at?: string
         }
       }
-    }
       checklist_templates: {
         Row: {
           id: string

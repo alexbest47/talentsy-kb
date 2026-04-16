@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Talentsy WorkSpace",
-  description: "Talentsy WorkSpace",
+  title: "Talentsy WorkPlace",
+  description: "Talentsy WorkPlace",
 };
 
 export default function RootLayout({

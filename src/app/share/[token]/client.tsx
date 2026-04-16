@@ -138,7 +138,7 @@ export default function SharePageClient() {
               <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">T</span>
               </div>
-              <h1 className="text-lg font-bold text-white">Talentsy WorkSpace</h1>
+              <h1 className="text-lg font-bold text-white">Talentsy WorkPlace</h1>
             </div>
             <p className="text-sm text-slate-400">Общий документ</p>
           </div>
@@ -171,7 +171,7 @@ export default function SharePageClient() {
         <div className="mt-12 text-center text-sm text-slate-400">
           <p className="mb-4">
             Этот документ предоставлен из&nbsp;
-            <span className="text-purple-400 font-semibold">Talentsy WorkSpace</span>
+            <span className="text-purple-400 font-semibold">Talentsy WorkPlace</span>
           </p>
           <p className="text-xs text-slate-500">
             © {new Date().getFullYear()} Talentsy. Все права защищены.
