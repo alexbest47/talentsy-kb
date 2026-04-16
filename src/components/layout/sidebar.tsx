@@ -25,16 +25,25 @@ import {
 import clsx from 'clsx'
 import { useRoleStore, ROLE_LABELS, ROLE_COLORS, type UserRole } from '@/lib/stores/role-store'
 
+/* ── Типы ── */
+
+interface NavItem {
+  label: string
+  href: string
+  /** slug отдела — используется для фильтрации у employee */
+  deptSlug?: string
+}
+
 interface NavSection {
   id: string
   label: string
   icon: React.ReactNode
   href?: string
-  items?: {
-    label: string
-    href: string
-  }[]
+  items?: NavItem[]
+  /** Минимальная роль для отображения всего раздела */
   minRole?: UserRole
+  /** Если true, items фильтруются по отделу у employee */
+  filterByDept?: boolean
 }
 
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
@@ -43,11 +52,9 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   admin: <Shield size={14} />,
 }
 
-// Fallback-заглушки УДАЛЕНЫ намеренно: раньше при неудачной
-// загрузке сессии показывался фейковый «Алексей Сидоров», что
-// вводило пользователей в заблуждение. Теперь, если профиль
-// ещё не загружен, показываем нейтральный placeholder.
 const LOADING_PROFILE = { full_name: 'Загрузка...', position: '' }
+
+/* ── Компонент ── */
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -61,59 +68,82 @@ export default function Sidebar() {
   const [roleSelectorOpen, setRoleSelectorOpen] = useState(false)
 
   const router = useRouter()
-  const [authProfile, setAuthProfile] = useState<{ full_name: string; position: string; email: string } | null>(null)
+  const [authProfile, setAuthProfile] = useState<{
+    full_name: string
+    position: string
+    email: string
+  } | null>(null)
+
+  /** Настоящая роль из БД (не меняется тестовым переключателем) */
+  const [realRole, setRealRole] = useState<UserRole>('employee')
+
+  /** slug отдела текущего пользователя (null = не привязан) */
+  const [userDeptSlug, setUserDeptSlug] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     let mounted = true
+
     const load = async () => {
       try {
-        const { data: { user }, error: userErr } = await supabase.auth.getUser()
-        if (userErr) {
-          console.warn('[sidebar] getUser error:', userErr.message)
-        }
+        const {
+          data: { user },
+          error: userErr,
+        } = await supabase.auth.getUser()
+        if (userErr) console.warn('[sidebar] getUser error:', userErr.message)
         if (!user || !mounted) return
+
+        // Загружаем профиль + slug отдела одним запросом
         const { data: prof, error: profErr } = await supabase
           .from('profiles')
-          .select('full_name, position, role, email')
+          .select('full_name, position, role, email, department_id, org_departments(slug)')
           .eq('id', user.id)
           .maybeSingle()
-        if (profErr) {
-          console.warn('[sidebar] profile fetch error:', profErr.message)
-        }
+        if (profErr) console.warn('[sidebar] profile fetch error:', profErr.message)
         if (!mounted) return
+
         const meta: any = user.user_metadata || {}
+        const dbRole = (prof?.role as UserRole) || 'employee'
+
         setAuthProfile({
           full_name: prof?.full_name || meta.full_name || user.email || 'Пользователь',
-          position: prof?.position || (prof?.role === 'admin' ? 'Администратор' : meta.role || ''),
+          position: prof?.position || ROLE_LABELS[dbRole] || '',
           email: user.email || '',
         })
-        if (prof?.role && (prof.role === 'admin' || prof.role === 'head' || prof.role === 'employee')) {
-          setRole(prof.role as UserRole)
+
+        setRealRole(dbRole)
+        setRole(dbRole)
+
+        // slug отдела (из join)
+        const dept = (prof as any)?.org_departments
+        if (dept?.slug) {
+          setUserDeptSlug(dept.slug)
         }
       } catch (e) {
         console.error('[sidebar] failed to load auth profile:', e)
       }
     }
+
     load()
     const { data: sub } = supabase.auth.onAuthStateChange(() => load())
-    return () => { mounted = false; sub.subscription.unsubscribe() }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const profile = authProfile || LOADING_PROFILE
 
+  /* ── Logout ── */
+
   const handleLogout = async () => {
     try {
       const supabase = createClient()
-      // Пытаемся корректно завершить сессию в Supabase
       await supabase.auth.signOut({ scope: 'local' })
     } catch (e) {
       console.warn('[sidebar] signOut failed, forcing redirect anyway:', e)
     }
-    // На всякий случай чистим ВСЕ sb-* cookies вручную (на случай,
-    // если signOut молча упал из-за протухшего токена) — и только
-    // затем делаем жёсткий редирект, чтобы сбросить весь state.
     try {
       if (typeof document !== 'undefined') {
         document.cookie
@@ -126,8 +156,6 @@ export default function Sidebar() {
           })
       }
     } catch {}
-    // Жёсткий редирект полностью перезагружает страницу и сбрасывает
-    // любой заcтрявший client-side state (role store, authProfile и т.д.).
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
     } else {
@@ -135,10 +163,56 @@ export default function Sidebar() {
     }
   }
 
+  /* ── Навигация ── */
+
   const canSee = (minRole?: UserRole) => {
     if (!minRole) return true
     const order: UserRole[] = ['employee', 'head', 'admin']
     return order.indexOf(role) >= order.indexOf(minRole)
+  }
+
+  // Пункты «Общее» — для employee скрыты «Стратегические цели» и «Должности»
+  const generalItems: NavItem[] = [
+    { label: 'Обзор', href: '/company' },
+    { label: 'Оргструктура', href: '/company/structure' },
+    { label: 'Открытые вакансии', href: '/company/vacancies' },
+    { label: 'Миссия', href: '/company/mission' },
+    { label: 'Принципы работы', href: '/company/values' },
+    ...(role !== 'employee'
+      ? [
+          { label: 'Стратегические цели', href: '/company/goals' },
+          { label: 'Должности', href: '/company/positions' },
+        ]
+      : []),
+  ]
+
+  // Все отделы
+  const allDepartments: NavItem[] = [
+    { label: 'Продажи', href: '/departments/sales', deptSlug: 'sales' },
+    { label: 'Маркетинг', href: '/departments/marketing', deptSlug: 'marketing' },
+    { label: 'Продукт', href: '/departments/product', deptSlug: 'product' },
+    { label: 'Технический', href: '/departments/tech', deptSlug: 'tech' },
+    { label: 'Финансы', href: '/departments/finance', deptSlug: 'finance' },
+    { label: 'Администрация', href: '/departments/admin', deptSlug: 'admin' },
+    { label: 'HR', href: '/departments/hr', deptSlug: 'hr' },
+  ]
+
+  // Все планёрки
+  const allMeetings: NavItem[] = [
+    { label: 'DreamTeam', href: '/meetings/dreamteam', deptSlug: '_all' },
+    { label: 'Продажи', href: '/meetings/sales', deptSlug: 'sales' },
+    { label: 'Маркетинг', href: '/meetings/marketing', deptSlug: 'marketing' },
+    { label: 'Продукт', href: '/meetings/product', deptSlug: 'product' },
+    { label: 'Технический', href: '/meetings/tech', deptSlug: 'tech' },
+    { label: 'Финансы', href: '/meetings/finance', deptSlug: 'finance' },
+    { label: 'Администрация', href: '/meetings/admin', deptSlug: 'admin' },
+    { label: 'HR', href: '/meetings/hr', deptSlug: 'hr' },
+  ]
+
+  /** Фильтр items по отделу для employee */
+  const filterDeptItems = (items: NavItem[]): NavItem[] => {
+    if (role !== 'employee' || !userDeptSlug) return items
+    return items.filter((i) => i.deptSlug === userDeptSlug || i.deptSlug === '_all')
   }
 
   const navSections: NavSection[] = [
@@ -152,15 +226,7 @@ export default function Sidebar() {
       id: 'general',
       label: 'Общее',
       icon: <Building2 size={20} />,
-      items: [
-        { label: 'Обзор', href: '/company' },
-        { label: 'Оргструктура', href: '/company/structure' },
-        { label: 'Открытые вакансии', href: '/company/vacancies' },
-        { label: 'Миссия', href: '/company/mission' },
-        { label: 'Принципы работы', href: '/company/values' },
-        { label: 'Стратегические цели', href: '/company/goals' },
-        { label: 'Должности', href: '/company/positions' },
-      ],
+      items: generalItems,
     },
     {
       id: 'onboarding',
@@ -184,37 +250,27 @@ export default function Sidebar() {
       id: 'departments',
       label: 'Отделы',
       icon: <Users size={20} />,
-      items: [
-        { label: 'Продажи', href: '/departments/sales' },
-        { label: 'Маркетинг', href: '/departments/marketing' },
-        { label: 'Продукт', href: '/departments/product' },
-        { label: 'Технический', href: '/departments/tech' },
-        { label: 'Финансы', href: '/departments/finance' },
-        { label: 'Администрация', href: '/departments/admin' },
-        { label: 'HR', href: '/departments/hr' },
-      ],
+      items: filterDeptItems(allDepartments),
+      filterByDept: true,
     },
     {
       id: 'meetings',
       label: 'Планерки',
       icon: <CalendarClock size={20} />,
-      items: [
-        { label: 'DreamTeam', href: '/meetings/dreamteam' },
-        { label: 'Продажи', href: '/meetings/sales' },
-        { label: 'Маркетинг', href: '/meetings/marketing' },
-        { label: 'Продукт', href: '/meetings/product' },
-        { label: 'Технический', href: '/meetings/tech' },
-        { label: 'Финансы', href: '/meetings/finance' },
-        { label: 'Администрация', href: '/meetings/admin' },
-        { label: 'HR', href: '/meetings/hr' },
-      ],
+      items: filterDeptItems(allMeetings),
+      filterByDept: true,
     },
-    {
-      id: 'docs',
-      label: 'Документы',
-      icon: <FileText size={20} />,
-      href: '/docs',
-    },
+    // «Документы» — скрыты от employee (но документы внутри разделов доступны)
+    ...(role !== 'employee'
+      ? [
+          {
+            id: 'docs',
+            label: 'Документы',
+            icon: <FileText size={20} />,
+            href: '/docs',
+          },
+        ]
+      : []),
     {
       id: 'checklists',
       label: 'Чек-листы',
@@ -329,64 +385,66 @@ export default function Sidebar() {
 
       {/* Role Switcher + User Profile */}
       <div className="px-4 py-4 border-t border-slate-700">
-        {/* Role Switcher */}
-        <div className="relative mb-3">
-          <button
-            onClick={() => setRoleSelectorOpen(!roleSelectorOpen)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <span className={clsx('w-2 h-2 rounded-full', ROLE_COLORS[role])} />
-              <span className="text-slate-300">{ROLE_LABELS[role]}</span>
-            </div>
-            <ChevronDown
-              size={14}
-              className={clsx(
-                'text-slate-400 transition-transform',
-                roleSelectorOpen && 'rotate-180'
-              )}
-            />
-          </button>
-
-          {roleSelectorOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-800 rounded-lg border border-slate-600 overflow-hidden shadow-xl">
-              <div className="px-3 py-2 border-b border-slate-700">
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Тестовый режим
-                </p>
+        {/* Role Switcher — ТОЛЬКО для настоящих админов */}
+        {realRole === 'admin' && (
+          <div className="relative mb-3">
+            <button
+              onClick={() => setRoleSelectorOpen(!roleSelectorOpen)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className={clsx('w-2 h-2 rounded-full', ROLE_COLORS[role])} />
+                <span className="text-slate-300">{ROLE_LABELS[role]}</span>
               </div>
-              {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => {
-                    setRole(r)
-                    setRoleSelectorOpen(false)
-                  }}
-                  className={clsx(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
-                    role === r
-                      ? 'bg-purple-600/20 text-purple-300'
-                      : 'text-slate-300 hover:bg-slate-700'
-                  )}
-                >
-                  <span className={clsx('w-2 h-2 rounded-full', ROLE_COLORS[r])} />
-                  <span className="flex items-center gap-2">
-                    {ROLE_ICONS[r]}
-                    {ROLE_LABELS[r]}
-                  </span>
-                  {role === r && (
-                    <span className="ml-auto text-xs text-purple-400">✓</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+              <ChevronDown
+                size={14}
+                className={clsx(
+                  'text-slate-400 transition-transform',
+                  roleSelectorOpen && 'rotate-180'
+                )}
+              />
+            </button>
+
+            {roleSelectorOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-800 rounded-lg border border-slate-600 overflow-hidden shadow-xl">
+                <div className="px-3 py-2 border-b border-slate-700">
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    Тестовый режим
+                  </p>
+                </div>
+                {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setRole(r)
+                      setRoleSelectorOpen(false)
+                    }}
+                    className={clsx(
+                      'w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
+                      role === r
+                        ? 'bg-purple-600/20 text-purple-300'
+                        : 'text-slate-300 hover:bg-slate-700'
+                    )}
+                  >
+                    <span className={clsx('w-2 h-2 rounded-full', ROLE_COLORS[r])} />
+                    <span className="flex items-center gap-2">
+                      {ROLE_ICONS[r]}
+                      {ROLE_LABELS[r]}
+                    </span>
+                    {role === r && (
+                      <span className="ml-auto text-xs text-purple-400">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* User Info */}
         <div className="flex items-center gap-3 mb-3">
           <img
-            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${role}`}
+            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${authProfile?.email || 'user'}`}
             alt={profile.full_name}
             className="w-10 h-10 rounded-full bg-slate-700"
           />
@@ -395,12 +453,15 @@ export default function Sidebar() {
               {profile.full_name}
             </p>
             <p className="text-xs text-slate-400 truncate">
-              {profile.position}
+              {ROLE_LABELS[role]}
             </p>
           </div>
         </div>
 
-        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+        >
           <LogOut size={16} />
           <span>Выход</span>
         </button>
