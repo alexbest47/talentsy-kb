@@ -236,7 +236,47 @@ const DEPT_LABELS: Record<string, string> = {
   finance: 'Финансы',
   admin: 'Администрация',
   hr: 'HR',
+  '_org_tree': 'Оргструктура',
 }
+
+/* ─── Helper: flatten org_tree Person into OrgEmployee[] ─── */
+interface OrgTreePerson {
+  id: string
+  name: string
+  position: string
+  isVacancy?: boolean
+  children?: OrgTreePerson[]
+}
+
+function flattenOrgTree(
+  node: OrgTreePerson,
+  parentLabel: string = 'Оргструктура',
+): OrgEmployee[] {
+  const result: OrgEmployee[] = []
+  // Determine label for children based on this node's position
+  const branchLabel = node.position || parentLabel
+
+  // Add this node if it's a real person (not vacancy, has name)
+  if (!node.isVacancy && node.name && node.name.trim()) {
+    result.push({
+      id: `_tree_${node.id}`,
+      name: node.name.trim(),
+      role: node.position || '',
+      department_slug: '_org_tree',
+      is_vacancy: false,
+    })
+  }
+
+  // Recurse into children
+  if (node.children) {
+    for (const child of node.children) {
+      result.push(...flattenOrgTree(child, branchLabel))
+    }
+  }
+  return result
+}
+
+const ORG_TREE_ID = '00000000-0000-0000-0000-000000000001'
 
 function SingleInviteModal({
   onClose,
@@ -255,14 +295,14 @@ function SingleInviteModal({
   const [msg, setMsg] = useState('')
   const [loadingOrg, setLoadingOrg] = useState(true)
 
-  // Загружаем сотрудников из оргструктуры
+  // Загружаем сотрудников из оргструктуры (org_employees + org_tree)
   useEffect(() => {
     const loadOrg = async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
 
-        const [empRes, deptRes] = await Promise.all([
+        const [empRes, deptRes, treeRes] = await Promise.all([
           supabase
             .from('org_employees')
             .select('id, name, role, department_slug, is_vacancy')
@@ -272,9 +312,34 @@ function SingleInviteModal({
             .from('org_departments')
             .select('slug, name')
             .order('sort_order'),
+          supabase
+            .from('org_tree')
+            .select('data')
+            .eq('id', ORG_TREE_ID)
+            .single(),
         ])
 
-        if (empRes.data) setEmployees(empRes.data as OrgEmployee[])
+        const dbEmployees = (empRes.data || []) as OrgEmployee[]
+
+        // Flatten org_tree into employee records
+        let treeEmployees: OrgEmployee[] = []
+        const treeData = treeRes.data as { data: OrgTreePerson } | null
+        if (treeData?.data) {
+          treeEmployees = flattenOrgTree(treeData.data)
+        }
+
+        // Merge: org_employees take priority, add tree employees not already present
+        const existingNames = new Set(
+          dbEmployees.map((e) => e.name.trim().toLowerCase())
+        )
+        const merged = [
+          ...dbEmployees,
+          ...treeEmployees.filter(
+            (te) => !existingNames.has(te.name.trim().toLowerCase())
+          ),
+        ]
+
+        setEmployees(merged)
         if (deptRes.data) setOrgDepts(deptRes.data as OrgDepartment[])
       } catch (e) {
         console.warn('Failed to load org structure:', e)
@@ -317,6 +382,8 @@ function SingleInviteModal({
     }
     setBusy(true)
     setMsg('')
+    // Tree-sourced employees have synthetic ids prefixed with _tree_
+    const isFromTree = selectedEmployee.id.startsWith('_tree_')
     const r = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -324,8 +391,8 @@ function SingleInviteModal({
         email,
         full_name: selectedEmployee.name,
         role: sysRole,
-        department_slug: selectedEmployee.department_slug,
-        org_employee_id: selectedEmployee.id,
+        department_slug: isFromTree ? undefined : selectedEmployee.department_slug,
+        org_employee_id: isFromTree ? undefined : selectedEmployee.id,
         position: selectedEmployee.role,
       }),
     })
