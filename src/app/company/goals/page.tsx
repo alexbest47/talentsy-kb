@@ -140,7 +140,6 @@ function GoalTreeNodeComponent({
   defaultExpanded: boolean
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const [goalsExpanded, setGoalsExpanded] = useState(defaultExpanded && node.goals.length > 0)
   const colors = getColors(level)
   const hasGoals = node.goals.length > 0
   const hasChildren = node.children.length > 0
@@ -153,13 +152,7 @@ function GoalTreeNodeComponent({
         {/* Header */}
         <div
           className={`flex items-center gap-3 p-4 ${colors.bg} cursor-pointer hover:opacity-90 transition-opacity`}
-          onClick={() => {
-            if (hasChildren) {
-              setExpanded(!expanded)
-            } else if (hasGoals) {
-              setGoalsExpanded(!goalsExpanded)
-            }
-          }}
+          onClick={() => setExpanded(!expanded)}
         >
           {/* Icon */}
           <div className="flex-shrink-0">
@@ -190,7 +183,7 @@ function GoalTreeNodeComponent({
               </span>
             )}
             {(hasChildren || hasGoals) && (
-              expanded || goalsExpanded ? (
+              expanded ? (
                 <ChevronDown size={18} className="text-slate-400" />
               ) : (
                 <ChevronRight size={18} className="text-slate-400" />
@@ -200,7 +193,7 @@ function GoalTreeNodeComponent({
         </div>
 
         {/* Goals list */}
-        {hasGoals && (expanded || goalsExpanded) && (
+        {hasGoals && expanded && (
           <div className="bg-white divide-y divide-slate-100 border-t border-slate-100">
             {node.goals.map((goal) => (
               <GoalItem key={goal.id} goal={goal} colors={colors} />
