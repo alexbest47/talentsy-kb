@@ -621,20 +621,29 @@ export default function StructurePage() {
     const load = async () => {
       try {
         const supabase = createClient()
-        const { data, error } = await supabase
+        // Таймаут 8 секунд, чтобы страница не висела бесконечно,
+        // если RLS/сессия заблокировали запрос.
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 8000)
+        )
+        const query = supabase
           .from('org_tree')
           .select('data')
           .eq('id', ORG_TREE_ID)
           .single()
+        const { data, error } = (await Promise.race([query, timeout])) as any
 
         if (!error && data && data.data && data.data.id) {
           setOrgData(data.data as Person)
         } else {
-          // First load — save default data
-          await supabase
-            .from('org_tree')
-            .update({ data: defaultOrgData as any, updated_at: new Date().toISOString() })
-            .eq('id', ORG_TREE_ID)
+          if (error) console.warn('[structure] load error:', error.message)
+          // First load — save default data (best-effort)
+          try {
+            await supabase
+              .from('org_tree')
+              .update({ data: defaultOrgData as any, updated_at: new Date().toISOString() })
+              .eq('id', ORG_TREE_ID)
+          } catch {}
         }
       } catch (err) {
         console.error('Error loading org tree:', err)

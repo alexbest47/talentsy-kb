@@ -21,6 +21,9 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 export const useRoleStore = create<RoleState>((set) => ({
-  role: 'admin',
+  // Default to 'employee' — реальная роль всегда подгружается
+  // из profiles после загрузки сессии. Дефолт 'admin' был багом,
+  // из-за которого при сломанной сессии показывалась заглушка-админ.
+  role: 'employee',
   setRole: (role) => set({ role }),
 }));

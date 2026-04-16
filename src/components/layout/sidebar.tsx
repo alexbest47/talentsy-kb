@@ -43,11 +43,11 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   admin: <Shield size={14} />,
 }
 
-const PROFILES: Record<UserRole, { full_name: string; position: string }> = {
-  employee: { full_name: 'Иван Иванов', position: 'Контент-менеджер' },
-  head: { full_name: 'Елена Петрова', position: 'Руководитель отдела маркетинга' },
-  admin: { full_name: 'Алексей Сидоров', position: 'Системный администратор' },
-}
+// Fallback-заглушки УДАЛЕНЫ намеренно: раньше при неудачной
+// загрузке сессии показывался фейковый «Алексей Сидоров», что
+// вводило пользователей в заблуждение. Теперь, если профиль
+// ещё не загружен, показываем нейтральный placeholder.
+const LOADING_PROFILE = { full_name: 'Загрузка...', position: '' }
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -60,7 +60,6 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [roleSelectorOpen, setRoleSelectorOpen] = useState(false)
 
-  const fallbackProfile = PROFILES[role]
   const router = useRouter()
   const [authProfile, setAuthProfile] = useState<{ full_name: string; position: string; email: string } | null>(null)
 
@@ -68,22 +67,32 @@ export default function Sidebar() {
     const supabase = createClient()
     let mounted = true
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !mounted) return
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('full_name, position, role, email')
-        .eq('id', user.id)
-        .maybeSingle()
-      if (!mounted) return
-      const meta: any = user.user_metadata || {}
-      setAuthProfile({
-        full_name: prof?.full_name || meta.full_name || user.email || 'Пользователь',
-        position: prof?.position || (prof?.role === 'admin' ? 'Администратор' : meta.role || ''),
-        email: user.email || '',
-      })
-      if (prof?.role && (prof.role === 'admin' || prof.role === 'head' || prof.role === 'employee')) {
-        setRole(prof.role as UserRole)
+      try {
+        const { data: { user }, error: userErr } = await supabase.auth.getUser()
+        if (userErr) {
+          console.warn('[sidebar] getUser error:', userErr.message)
+        }
+        if (!user || !mounted) return
+        const { data: prof, error: profErr } = await supabase
+          .from('profiles')
+          .select('full_name, position, role, email')
+          .eq('id', user.id)
+          .maybeSingle()
+        if (profErr) {
+          console.warn('[sidebar] profile fetch error:', profErr.message)
+        }
+        if (!mounted) return
+        const meta: any = user.user_metadata || {}
+        setAuthProfile({
+          full_name: prof?.full_name || meta.full_name || user.email || 'Пользователь',
+          position: prof?.position || (prof?.role === 'admin' ? 'Администратор' : meta.role || ''),
+          email: user.email || '',
+        })
+        if (prof?.role && (prof.role === 'admin' || prof.role === 'head' || prof.role === 'employee')) {
+          setRole(prof.role as UserRole)
+        }
+      } catch (e) {
+        console.error('[sidebar] failed to load auth profile:', e)
       }
     }
     load()
@@ -92,12 +101,38 @@ export default function Sidebar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const profile = authProfile || fallbackProfile
+  const profile = authProfile || LOADING_PROFILE
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
+    try {
+      const supabase = createClient()
+      // Пытаемся корректно завершить сессию в Supabase
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch (e) {
+      console.warn('[sidebar] signOut failed, forcing redirect anyway:', e)
+    }
+    // На всякий случай чистим ВСЕ sb-* cookies вручную (на случай,
+    // если signOut молча упал из-за протухшего токена) — и только
+    // затем делаем жёсткий редирект, чтобы сбросить весь state.
+    try {
+      if (typeof document !== 'undefined') {
+        document.cookie
+          .split(';')
+          .map((c) => c.trim().split('=')[0])
+          .filter((n) => n.startsWith('sb-'))
+          .forEach((n) => {
+            document.cookie = `${n}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT`
+            document.cookie = `${n}=; Path=/; Domain=${window.location.hostname}; Expires=Thu, 01 Jan 1970 00:00:01 GMT`
+          })
+      }
+    } catch {}
+    // Жёсткий редирект полностью перезагружает страницу и сбрасывает
+    // любой заcтрявший client-side state (role store, authProfile и т.д.).
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    } else {
+      router.push('/login')
+    }
   }
 
   const canSee = (minRole?: UserRole) => {
