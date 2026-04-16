@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+
+function describeOtpError(code: string, description: string): string {
+  if (code === 'otp_expired' || description.toLowerCase().includes('expired')) {
+    return 'Срок действия ссылки истёк. Запросите новое письмо — каждая новая ссылка делает предыдущие недействительными, поэтому используйте самое свежее письмо из почты.'
+  }
+  if (code === 'access_denied') {
+    return 'Ссылка уже использована или отозвана. Запросите новое письмо для восстановления пароля.'
+  }
+  return description || 'Ссылка недействительна. Запросите новое письмо для восстановления пароля.'
+}
 
 export default function SetPasswordPage() {
   const router = useRouter()
@@ -12,6 +23,8 @@ export default function SetPasswordPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  const [linkInvalid, setLinkInvalid] = useState(false)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     const init = async () => {
@@ -19,19 +32,34 @@ export default function SetPasswordPage() {
       const existing = await supabase.auth.getSession()
       if (existing.data.session) {
         setReady(true)
+        setChecking(false)
         // почистим URL от возможных code/hash
         const url0 = new URL(window.location.href)
         window.history.replaceState({}, '', url0.pathname)
         return
       }
 
-      // PKCE flow: ?code=...  (fallback если сюда пришли напрямую, минуя /auth/callback)
       const url = new URL(window.location.href)
+
+      // Обработка ошибок в hash: #error=access_denied&error_code=otp_expired&error_description=...
+      if (window.location.hash.includes('error')) {
+        const hash = new URLSearchParams(window.location.hash.slice(1))
+        const errCode = hash.get('error_code') || hash.get('error') || ''
+        const errDesc = hash.get('error_description') || ''
+        setLinkInvalid(true)
+        setError(describeOtpError(errCode, decodeURIComponent(errDesc.replace(/\+/g, ' '))))
+        window.history.replaceState({}, '', url.pathname)
+        setChecking(false)
+        return
+      }
+
+      // PKCE flow: ?code=...  (fallback если сюда пришли напрямую, минуя /auth/callback)
       const code = url.searchParams.get('code')
       if (code) {
         try {
           await supabase.auth.exchangeCodeForSession(code)
         } catch (e: any) {
+          setLinkInvalid(true)
           setError(
             e?.message ||
               'Не удалось активировать ссылку. Откройте письмо в том же браузере, в котором запрашивали восстановление, или запросите новую ссылку.'
@@ -47,13 +75,18 @@ export default function SetPasswordPage() {
           try {
             await supabase.auth.setSession({ access_token, refresh_token })
           } catch (e: any) {
+            setLinkInvalid(true)
             setError(e?.message || 'Не удалось активировать ссылку')
           }
         }
         window.history.replaceState({}, '', url.pathname)
+      } else {
+        // Ни кода, ни токена, ни ошибки — похоже, страницу открыли напрямую.
+        setLinkInvalid(true)
       }
       const { data } = await supabase.auth.getSession()
       setReady(!!data.session)
+      setChecking(false)
     }
     init()
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -98,55 +131,77 @@ export default function SetPasswordPage() {
           </p>
         </div>
 
-        <form
-          onSubmit={submit}
-          className="bg-white rounded-lg shadow-lg p-8 space-y-5"
-        >
-          {!ready && (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
-              Проверка ссылки... Если эта страница открыта не из письма-приглашения,
-              запросите новое приглашение у администратора.
-            </p>
-          )}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-700">{error}</p>
+        {checking ? (
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="inline-block w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4" />
+            <p className="text-sm text-slate-600">Проверяем ссылку...</p>
+          </div>
+        ) : linkInvalid ? (
+          <div className="bg-white rounded-lg shadow-lg p-8 space-y-5">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h2 className="text-sm font-semibold text-red-800 mb-1">
+                Ссылка недействительна
+              </h2>
+              <p className="text-sm text-red-700">
+                {error || 'Ссылка для восстановления пароля больше не работает. Запросите новое письмо.'}
+              </p>
             </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-slate-900 mb-1">
-              Новый пароль
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-            />
+            <Link
+              href="/login"
+              className="block w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition"
+            >
+              Запросить новую ссылку
+            </Link>
+            <p className="text-xs text-slate-500 text-center">
+              Совет: каждое новое письмо делает предыдущие ссылки недействительными.
+              Открывайте самое свежее письмо из почты.
+            </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-900 mb-1">
-              Подтвердите пароль
-            </label>
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={busy || !ready}
-            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white font-medium py-2.5 rounded-lg transition"
+        ) : (
+          <form
+            onSubmit={submit}
+            className="bg-white rounded-lg shadow-lg p-8 space-y-5"
           >
-            {busy ? 'Сохраняем...' : 'Сохранить пароль'}
-          </button>
-        </form>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-900 mb-1">
+                Новый пароль
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-900 mb-1">
+                Подтвердите пароль
+              </label>
+              <input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white font-medium py-2.5 rounded-lg transition"
+            >
+              {busy ? 'Сохраняем...' : 'Сохранить пароль'}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   )
