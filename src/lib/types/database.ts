@@ -9,7 +9,7 @@ export type Database = {
           avatar_url: string | null
           position: string | null
           department_id: string | null
-          role: 'admin' | 'head' | 'employee' | 'guest'
+          role: 'admin' | 'head' | 'employee'
           phone: string | null
           bio: string | null
           is_active: boolean
@@ -23,7 +23,7 @@ export type Database = {
           avatar_url?: string | null
           position?: string | null
           department_id?: string | null
-          role?: 'admin' | 'head' | 'employee' | 'guest'
+          role?: 'admin' | 'head' | 'employee'
           phone?: string | null
           bio?: string | null
           is_active?: boolean
@@ -37,7 +37,7 @@ export type Database = {
           avatar_url?: string | null
           position?: string | null
           department_id?: string | null
-          role?: 'admin' | 'head' | 'employee' | 'guest'
+          role?: 'admin' | 'head' | 'employee'
           phone?: string | null
           bio?: string | null
           is_active?: boolean
@@ -527,7 +527,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: 'admin' | 'head' | 'employee' | 'guest'
+      user_role: 'admin' | 'head' | 'employee'
       document_status: 'draft' | 'published' | 'archived'
       product_type: 'paid' | 'free'
       product_status: 'draft' | 'active' | 'archived'

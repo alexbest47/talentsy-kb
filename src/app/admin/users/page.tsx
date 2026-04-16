@@ -17,14 +17,12 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Администратор',
   head: 'Руководитель',
   employee: 'Сотрудник',
-  guest: 'Гость',
 }
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-red-100 text-red-700',
   head: 'bg-amber-100 text-amber-700',
   employee: 'bg-blue-100 text-blue-700',
-  guest: 'bg-slate-100 text-slate-500',
 }
 
 export default function UsersPage() {
@@ -298,7 +296,6 @@ function SingleInviteModal({
               <option value="employee">Сотрудник</option>
               <option value="head">Руководитель</option>
               <option value="admin">Администратор</option>
-              <option value="guest">Гость (только публичные ссылки)</option>
             </select>
           </div>
           <p className="text-xs text-slate-500 flex items-start gap-2">
@@ -402,7 +399,6 @@ function BulkInviteModal({
               <option value="employee">Сотрудник</option>
               <option value="head">Руководитель</option>
               <option value="admin">Администратор</option>
-              <option value="guest">Гость (только публичные ссылки)</option>
             </select>
           </div>
           <p className="text-xs text-slate-500 flex items-start gap-2">

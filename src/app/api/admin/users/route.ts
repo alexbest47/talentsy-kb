@@ -47,7 +47,7 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   'http://localhost:3000'
 
-const VALID_ROLES = new Set(['admin', 'head', 'employee', 'guest'])
+const VALID_ROLES = new Set(['admin', 'head', 'employee'])
 
 // GET /api/admin/users — list all users (admin only)
 export async function GET() {

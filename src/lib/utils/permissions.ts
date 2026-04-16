@@ -16,10 +16,6 @@ export function isEmployee(profile: Profile | null): boolean {
   return profile?.role === 'employee'
 }
 
-export function isGuest(profile: Profile | null): boolean {
-  return profile?.role === 'guest'
-}
-
 export function canAccessSection(
   profile: Profile | null,
   section: Section | null

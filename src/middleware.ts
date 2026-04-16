@@ -3,10 +3,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 /**
  * Маршрутизация ролей:
- * - /share/*, /login, /auth/* — публичные, доступны без входа
+ * - /share/*, /login, /auth/* — публичные, доступны без входа (открываются кем угодно из интернета)
  * - Все остальные маршруты требуют залогиненного пользователя
  * - /admin/* — только для роли admin
- * - Роль guest имеет доступ ТОЛЬКО к /share/* (всё остальное → редирект на /share-only)
  */
 
 const PUBLIC_PATHS = [
@@ -14,7 +13,6 @@ const PUBLIC_PATHS = [
   '/auth',
   '/share',
   '/api/auth',
-  '/share-only',
 ]
 
 function isPublicPath(pathname: string): boolean {
@@ -41,9 +39,9 @@ export async function middleware(request: NextRequest) {
   if (pkceCode && !pathname.startsWith('/auth/callback')) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/callback'
-    // сохраняем текущий путь как next (если это не login/share-only)
+    // сохраняем текущий путь как next (если это не login/корень)
     const next =
-      pathname === '/' || pathname === '/login' || pathname === '/share-only'
+      pathname === '/' || pathname === '/login'
         ? '/auth/set-password'
         : pathname
     url.searchParams.set('code', pkceCode)
@@ -104,15 +102,7 @@ export async function middleware(request: NextRequest) {
 
   const role = profile?.role ?? 'employee'
 
-  // 4. Гость имеет доступ только к /share/* (и public paths, но они уже выше пропущены).
-  //    Любой другой путь → редирект на /share-only (информационная страница).
-  if (role === 'guest') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/share-only'
-    return NextResponse.redirect(url)
-  }
-
-  // 5. /admin/* только для admin
+  // 4. /admin/* только для admin
   if (pathname.startsWith('/admin') && role !== 'admin') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
