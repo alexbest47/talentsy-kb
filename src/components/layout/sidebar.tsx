@@ -94,9 +94,10 @@ export default function Sidebar() {
         if (!user || !mounted) return
 
         // Загружаем профиль + slug отдела одним запросом
+        // FK profiles.department_id → departments (не org_departments!)
         const { data: prof, error: profErr } = await supabase
           .from('profiles')
-          .select('full_name, position, role, email, department_id, org_departments(slug)')
+          .select('full_name, position, role, email, department_id, departments(slug)')
           .eq('id', user.id)
           .maybeSingle()
         if (profErr) console.warn('[sidebar] profile fetch error:', profErr.message)
@@ -115,7 +116,7 @@ export default function Sidebar() {
         setRole(dbRole)
 
         // slug отдела (из join)
-        const dept = (prof as any)?.org_departments
+        const dept = (prof as any)?.departments
         if (dept?.slug) {
           setUserDeptSlug(dept.slug)
         }
