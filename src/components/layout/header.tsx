@@ -24,6 +24,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/news': 'Новости',
   '/admin': 'Администрирование',
   '/admin/users': 'Управление пользователями',
+  '/admin/trainings': 'Тренинги',
+  '/trainings': 'Обучение и тренинги',
 }
 
 function generateBreadcrumbs(pathname: string) {

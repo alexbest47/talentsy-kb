@@ -63,7 +63,9 @@ export default function Sidebar() {
     general: true,
     products: false,
     departments: false,
+    trainings: false,
   })
+  const [trainingItems, setTrainingItems] = useState<NavItem[]>([])
   const [mobileOpen, setMobileOpen] = useState(false)
   const [roleSelectorOpen, setRoleSelectorOpen] = useState(false)
 
@@ -141,7 +143,31 @@ export default function Sidebar() {
       }
     }
 
+    const loadTrainings = async () => {
+      try {
+        const { data: rows, error } = await supabase
+          .from('trainings')
+          .select('slug, title, sort_order, is_published')
+          .eq('is_published', true)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true })
+        if (error) {
+          console.warn('[sidebar] trainings fetch error:', error.message)
+          return
+        }
+        if (!mounted) return
+        const items: NavItem[] = ((rows as any[]) || []).map((t) => ({
+          label: t.title || t.slug,
+          href: `/trainings/${t.slug}`,
+        }))
+        setTrainingItems(items)
+      } catch (e) {
+        console.warn('[sidebar] trainings load failed:', e)
+      }
+    }
+
     load()
+    loadTrainings()
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       // Если пришло событие с сессией — сразу загружаем профиль
       if (session?.user) load()
@@ -252,10 +278,13 @@ export default function Sidebar() {
       items: generalItems,
     },
     {
-      id: 'onboarding',
-      label: 'Welcome тренинг',
+      id: 'trainings',
+      label: 'Обучение и тренинги',
       icon: <GraduationCap size={20} />,
-      href: '/onboarding',
+      items:
+        trainingItems.length > 0
+          ? trainingItems
+          : [{ label: 'Welcome тренинг', href: '/trainings/welcome' }],
     },
     {
       id: 'products',

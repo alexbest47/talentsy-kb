@@ -8,6 +8,14 @@ import { type NextRequest, NextResponse } from 'next/server'
  * - /admin/* — только для роли admin
  */
 
+// Сервер-сайд: ходим к Supabase напрямую в обход прокси.
+// Браузерные клиенты идут через прокси (NEXT_PUBLIC_SUPABASE_URL), чтобы пользователи из РФ
+// могли открывать приложение без VPN. storageKey зафиксирован по оригинальному project ref —
+// чтобы имя auth-cookie не изменилось после переключения браузерных клиентов на прокси.
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_STORAGE_KEY = 'sb-lbpebpdmerhvbefrbgbv-auth-token'
+
 const PUBLIC_PATHS = [
   '/login',
   '/auth',
@@ -54,9 +62,12 @@ export async function middleware(request: NextRequest) {
   })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      auth: {
+        storageKey: SUPABASE_STORAGE_KEY,
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll()

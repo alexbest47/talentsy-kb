@@ -36,12 +36,12 @@ const adminCards: AdminCard[] = [
     stats: 'Квартальные OKR и KPI',
   },
   {
-    id: 'welcome-training',
-    title: 'Welcome тренинг',
-    description: 'Редактирование этапов, описаний, материалов и видео',
+    id: 'trainings',
+    title: 'Тренинги',
+    description: 'Добавление и редактирование обучающих программ (Welcome, продажи, продукт и др.)',
     icon: <GraduationCap size={32} />,
-    href: '/admin/welcome-training',
-    stats: 'Программа адаптации новых сотрудников',
+    href: '/admin/trainings',
+    stats: 'Этапы, видео Kinescope и прикреплённые документы',
   },
   {
     id: 'users',

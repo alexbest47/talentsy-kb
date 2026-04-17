@@ -2,6 +2,13 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 import { Database } from '@/lib/types/database'
 
+// Сервер-сайд: ходим к Supabase напрямую (SUPABASE_URL), в обход прокси.
+// storageKey привязан к оригинальному project ref — чтобы auth-cookie не теряли имя
+// после переключения браузерных клиентов на прокси.
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_STORAGE_KEY = 'sb-lbpebpdmerhvbefrbgbv-auth-token'
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -10,9 +17,12 @@ export async function updateSession(request: NextRequest) {
   })
 
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      auth: {
+        storageKey: SUPABASE_STORAGE_KEY,
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll()

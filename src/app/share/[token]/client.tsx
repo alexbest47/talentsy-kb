@@ -32,9 +32,14 @@ export default function SharePageClient() {
         setError(null)
 
         // Create Supabase browser client
+        // storageKey зафиксирован по оригинальному project ref — чтобы после переключения
+        // NEXT_PUBLIC_SUPABASE_URL на прокси имя auth-cookie не поменялось.
         const supabase = createBrowserClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            auth: { storageKey: 'sb-lbpebpdmerhvbefrbgbv-auth-token' },
+          }
         )
 
         // Fetch document by share token with external access

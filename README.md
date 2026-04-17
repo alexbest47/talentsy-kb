@@ -11,10 +11,20 @@ npm install
 ### 2. Переменные окружения
 Файл `.env.local` уже создан с ключами Supabase. Проверьте:
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://lbpebpdmerhvbefrbgbv.supabase.co
+# URL в браузере — идёт через прокси (для пользователей из РФ без VPN)
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.talentsy.ru/proxy/lbpebpdmerhvbefrbgbv
+
+# URL на сервере (Route Handlers, middleware) — напрямую к Supabase
+SUPABASE_URL=https://lbpebpdmerhvbefrbgbv.supabase.co
+
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+**Зачем две переменные?** Прокси `supabase.talentsy.ru` нужен только браузерам пользователей из РФ — Vercel (где работает сервер) к Supabase обращается напрямую, без лишнего хопа.
+
+Если `SUPABASE_URL` не задан — код сфоллбэчится на `NEXT_PUBLIC_SUPABASE_URL` (всё продолжит работать, просто серверные запросы тоже пойдут через прокси).
 
 ### 3. Создание первого администратора
 Откройте Supabase Dashboard → Authentication → Users → Add User:
