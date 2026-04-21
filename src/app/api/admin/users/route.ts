@@ -18,7 +18,7 @@ function getAdminClient() {
   })
 }
 
-// Guard: only authenticated admins can call this endpoint.
+// Guard: only authenticated admins or heads can call this endpoint.
 // Returns null on success, or a NextResponse (401/403) on failure.
 async function requireAdmin(): Promise<NextResponse | null> {
   const supabase = await createServerClient()
@@ -36,9 +36,10 @@ async function requireAdmin(): Promise<NextResponse | null> {
     .select('role')
     .eq('id', user.id)
     .single()
-  if (error || !profile || (profile as any).role !== 'admin') {
+  const role = (profile as any)?.role
+  if (error || !profile || (role !== 'admin' && role !== 'head')) {
     return NextResponse.json(
-      { error: 'Доступ запрещён: требуется роль администратора' },
+      { error: 'Доступ запрещён: требуется роль администратора или руководителя' },
       { status: 403 }
     )
   }

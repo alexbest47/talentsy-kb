@@ -122,8 +122,8 @@ export async function middleware(request: NextRequest) {
 
   const role = profile?.role ?? 'employee'
 
-  // 4. /admin/* только для admin
-  if (pathname.startsWith('/admin') && role !== 'admin') {
+  // 4. /admin/* доступно для admin и head
+  if (pathname.startsWith('/admin') && role !== 'admin' && role !== 'head') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

@@ -334,7 +334,7 @@ export default function Sidebar() {
       label: 'Администрирование',
       icon: <Settings size={20} />,
       href: '/admin',
-      minRole: 'admin',
+      minRole: 'head',
     },
   ]
 

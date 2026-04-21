@@ -98,12 +98,12 @@ export function canPublishDocument(
 
 export function canManageUsers(profile: Profile | null): boolean {
   if (!profile) return false
-  return isAdmin(profile)
+  return isAdmin(profile) || isHead(profile)
 }
 
 export function canManageDepartments(profile: Profile | null): boolean {
   if (!profile) return false
-  return isAdmin(profile)
+  return isAdmin(profile) || isHead(profile)
 }
 
 export function canManageSections(profile: Profile | null): boolean {
