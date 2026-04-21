@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { createClient } from '@/lib/supabase/client'
+import { getShareUrl } from '@/lib/share-url'
 import { useRoleStore } from '@/lib/stores/role-store'
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
@@ -125,7 +126,7 @@ function DocCard({
 }) {
   const [copied, setCopied] = useState(false)
   const shareUrl = doc.access === 'external' && doc.share_token
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${doc.share_token}`
+    ? getShareUrl(doc.share_token)
     : null
 
   const handleCopy = () => {

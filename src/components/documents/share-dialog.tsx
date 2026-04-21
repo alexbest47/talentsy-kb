@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Copy, Check, Lock, Unlock } from 'lucide-react'
 import clsx from 'clsx'
+import { getShareUrl } from '@/lib/share-url'
 
 interface ShareDialogProps {
   documentId: string
@@ -19,9 +20,7 @@ export default function ShareDialog({
 }: ShareDialogProps) {
   const [copied, setCopied] = useState(false)
 
-  const shareUrl = shareToken
-    ? `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/share/${shareToken}`
-    : null
+  const shareUrl = shareToken ? getShareUrl(shareToken) : null
 
   const handleCopyLink = () => {
     if (shareUrl) {

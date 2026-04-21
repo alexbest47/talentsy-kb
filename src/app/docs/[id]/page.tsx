@@ -18,6 +18,7 @@ import {
 import clsx from 'clsx'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import { getShareUrl } from '@/lib/share-url'
 import ShareDialog from '@/components/documents/share-dialog'
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false })
@@ -90,7 +91,7 @@ export default function DocPage() {
   }
 
   const shareUrl = doc.access === 'external' && doc.share_token
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${doc.share_token}`
+    ? getShareUrl(doc.share_token)
     : null
 
   const handleCopy = () => {
