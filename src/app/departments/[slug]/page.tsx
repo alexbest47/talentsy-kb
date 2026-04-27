@@ -1095,41 +1095,68 @@ function DocumentsTab({ slug }: { slug: string }) {
     )
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {documents.map((doc) => (
-          <div key={doc.id} className="bg-white border border-slate-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                <FileText size={20} className="text-purple-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900 truncate">{doc.title}</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {doc.category && <span className="text-purple-600">{doc.category} · </span>}
-                  {new Date(doc.created_at).toLocaleDateString('ru-RU')}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/docs/${doc.id}`}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 transition-colors"
-              >
-                <Eye size={14} />
-                Открыть
-              </Link>
-              <Link
-                href={`/docs/${doc.id}/edit`}
-                className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-              >
-                <Edit size={14} />
-              </Link>
-            </div>
-          </div>
-        ))}
+  // Группируем документы: «Продукты» — категория содержит «Продукт» / «Курс»,
+  // всё остальное (Регламент, Инструкция, …) попадает в «Регламенты».
+  const isProduct = (cat: string | null | undefined) => {
+    if (!cat) return false
+    const c = cat.toLowerCase()
+    return c.includes('продукт') || c.includes('курс')
+  }
+  const reglamenty = documents.filter((d) => !isProduct(d.category))
+  const produkty = documents.filter((d) => isProduct(d.category))
+
+  const renderCard = (doc: Document) => (
+    <div key={doc.id} className="bg-white border border-slate-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+          <FileText size={20} className="text-purple-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-slate-900 truncate">{doc.title}</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            {doc.category && <span className="text-purple-600">{doc.category} · </span>}
+            {new Date(doc.created_at).toLocaleDateString('ru-RU')}
+          </p>
+        </div>
       </div>
+      <div className="flex items-center gap-2">
+        <Link
+          href={`/docs/${doc.id}`}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 transition-colors"
+        >
+          <Eye size={14} />
+          Открыть
+        </Link>
+        <Link
+          href={`/docs/${doc.id}/edit`}
+          className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+        >
+          <Edit size={14} />
+        </Link>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-8">
+      {reglamenty.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Регламенты</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {reglamenty.map(renderCard)}
+          </div>
+        </section>
+      )}
+
+      {produkty.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Продукты</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {produkty.map(renderCard)}
+          </div>
+        </section>
+      )}
+
       <div className="pt-4">
         <Link
           href={`/docs/new?department=${slug}`}
