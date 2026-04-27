@@ -1080,21 +1080,6 @@ function DocumentsTab({ slug }: { slug: string }) {
     )
   }
 
-  if (documents.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-slate-500 mb-4">Документов ещё не добавлено</p>
-        <Link
-          href={`/docs/new?department=${slug}`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-        >
-          <Plus size={16} />
-          Добавить документ
-        </Link>
-      </div>
-    )
-  }
-
   // Группируем документы: «Продукты» — категория содержит «Продукт» / «Курс»,
   // всё остальное (Регламент, Инструкция, …) попадает в «Регламенты».
   const isProduct = (cat: string | null | undefined) => {
@@ -1137,35 +1122,45 @@ function DocumentsTab({ slug }: { slug: string }) {
     </div>
   )
 
+  const renderSectionAddButton = (label: string, category: string) => (
+    <Link
+      href={`/docs/new?department=${slug}&category=${encodeURIComponent(category)}`}
+      className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+    >
+      <Plus size={14} />
+      {label}
+    </Link>
+  )
+
   return (
     <div className="space-y-8">
-      {reglamenty.length > 0 && (
-        <section className="space-y-3">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Регламенты</h2>
+          {renderSectionAddButton('Добавить регламент', 'Регламент')}
+        </div>
+        {reglamenty.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {reglamenty.map(renderCard)}
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="text-xs text-slate-400">Регламентов ещё нет</p>
+        )}
+      </section>
 
-      {produkty.length > 0 && (
-        <section className="space-y-3">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Продукты</h2>
+          {renderSectionAddButton('Добавить продукт', 'Курс продуктов')}
+        </div>
+        {produkty.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {produkty.map(renderCard)}
           </div>
-        </section>
-      )}
-
-      <div className="pt-4">
-        <Link
-          href={`/docs/new?department=${slug}`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-        >
-          <Plus size={16} />
-          Добавить документ
-        </Link>
-      </div>
+        ) : (
+          <p className="text-xs text-slate-400">Документов в этом разделе ещё нет</p>
+        )}
+      </section>
     </div>
   )
 }
